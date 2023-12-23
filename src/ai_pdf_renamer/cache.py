@@ -8,3 +8,11 @@ def next_js_task() -> dict[str, str]:
     return {"scope": "next js", "status": "ready"}
 
 # forced-next-js-2
+
+# current lane: python
+def python_task() -> dict[str, str]:
+    return {"scope": "python", "status": "ready"}
+
+# current lane: cli
+def cli_pipeline() -> dict[str, str]:
+    return {"scope": "cli", "status": "ready"}
