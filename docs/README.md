@@ -2,13 +2,18 @@
 
 
 ## Context
-This page tracks bootstrap decisions for readme during migration window work.
+This page keeps the current readme guidance concise after earlier rough notes.
 
 ## Usage
-- Merged scattered python guidance into the docs.
+- Merged scattered next js guidance into the docs.
 
-## Scratch Notes
+- Earlier scratch notes were compressed into the current guidance.
+
+## Notes Folded Into Current Flow
 Early notes are still uneven and may be folded into clearer sections later.
 
 ## Caveats
 Some setup details still depend on the current local workflow and may change again.
+
+## Revision Notes
+Latest pass: next-js during steady build work (forced-next-js-5).
