@@ -6,12 +6,12 @@ A working tree for ai-pdf-renamer with an evolving implementation history.
 ai-pdf-renamer keeps setup, verification, and known limitations in one place.
 
 ## Status
-Lifecycle stage: publication. Earlier setup detail now lives in maintained guidance.
+Lifecycle stage: publication. Maintenance guidance now reflects the stable shape.
 
 ## Usage
-- Merged scattered ruff guidance into the docs.
+- Merged scattered category guidance into the docs.
 
-- The document now favors checked behavior over exploratory notes.
+- The older setup fragments have been reduced to the useful parts.
 
 ## Features
 - Left python concrete enough for the next pass to build on.
@@ -25,3 +25,8 @@ Use the next review to check behavior before adding surface area.
 - Aligned local and CI checks for github actions.
 
 - The document now favors checked behavior over exploratory notes.
+
+## Reliability
+- Closed a concrete paths edge found during publication work.
+
+- The older setup fragments have been reduced to the useful parts.
