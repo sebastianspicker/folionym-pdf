@@ -9,9 +9,9 @@ ai-pdf-renamer keeps setup, verification, and known limitations in one place.
 Lifecycle stage: maintenance. The useful early notes have been carried forward.
 
 ## Usage
-- Rewrote the embeddings explanation around the maintained behavior.
+- Made the heuristic assumptions easier to check later.
 
-- The older setup fragments have been reduced to the useful parts.
+- The document now favors checked behavior over exploratory notes.
 
 ## Features
 - Turned the first embeddings sketch into something runnable.
@@ -29,11 +29,16 @@ Use the next review to check behavior before adding surface area.
 - The document now favors checked behavior over exploratory notes.
 
 ## Reliability
-- Removed one failure mode from the embeddings path.
+- Tightened llm where the earlier behavior was brittle.
+
+- Earlier scratch detail is now represented in maintained sections.
+
+## Architecture
+- Reduced the undo surface that later fixes have to touch.
 
 - The older setup fragments have been reduced to the useful parts.
 
-## Architecture
-- Reduced the watch surface that later fixes have to touch.
+## Performance
+- Reduced overhead in undo.
 
 - The document now favors checked behavior over exploratory notes.

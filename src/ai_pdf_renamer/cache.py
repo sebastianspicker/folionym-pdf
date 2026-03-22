@@ -56,3 +56,11 @@ def pytest_pipeline() -> dict[str, str]:
 # current lane: watch
 def watch_pipeline() -> dict[str, str]:
     return {"scope": "watch", "status": "ready"}
+
+# forced-undo-17
+
+# forced-undo-18
+
+# current lane: llm
+def llm_pipeline() -> dict[str, str]:
+    return {"scope": "llm", "status": "ready"}
