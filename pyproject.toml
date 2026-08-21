@@ -23,23 +23,22 @@ classifiers = [
 ]
 dependencies = [
   "PyYAML>=6.0.0",
+  "cryptography>=50.0.0",
   "requests>=2.33.0",
   "rich>=13.0.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/sebastianspicker/AI-PDF-Renamer#readme"
-Source = "https://github.com/sebastianspicker/AI-PDF-Renamer"
-Issues = "https://github.com/sebastianspicker/AI-PDF-Renamer/issues"
-Changelog = "https://github.com/sebastianspicker/AI-PDF-Renamer/blob/main/CHANGELOG.md"
-Security = "https://github.com/sebastianspicker/AI-PDF-Renamer/security/policy"
-Documentation = "https://github.com/sebastianspicker/AI-PDF-Renamer/tree/main/docs"
+Homepage = "https://github.com/sebastianspicker/folionym#readme"
+Source = "https://github.com/sebastianspicker/folionym"
+Issues = "https://github.com/sebastianspicker/folionym/issues"
+Changelog = "https://github.com/sebastianspicker/folionym/blob/main/CHANGELOG.md"
+Security = "https://github.com/sebastianspicker/folionym/security/policy"
+Documentation = "https://github.com/sebastianspicker/folionym/tree/main/docs"
 
 [project.optional-dependencies]
 dev = [
   "pytest>=9.0.3",
-  "pytest-asyncio>=0.23.0",
-  "pytest-cov>=6.0.0",
   "ruff>=0.6.0",
   "mypy>=1.11.0",
   "types-requests>=2.32.0",
@@ -87,11 +86,9 @@ include = [
   "/docs/README.md",
   "/docs/frontend.md",
   "/docs/releases",
-  "/docs/screenshots",
   "/docs/tui.md",
   "/frontend",
   "/pyproject.toml",
-  "/scripts/capture_tui_screenshots.py",
   "/scripts/repository_hygiene.py",
   "/scripts/verify_distributions.py",
   "/src/folionym",
@@ -106,21 +103,6 @@ packages = ["src/folionym"]
 testpaths = ["tests"]
 addopts = "-q"
 pythonpath = ["src"]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
-
-[tool.coverage.run]
-source = ["folionym"]
-branch = true
-
-[tool.coverage.report]
-fail_under = 85
-show_missing = true
-exclude_lines = [
-  "pragma: no cover",
-  "if TYPE_CHECKING:",
-  "if __name__ == .__main__.",
-]
 
 [tool.bandit]
 exclude_dirs = ["tests"]
@@ -158,8 +140,8 @@ strict = true
 warn_return_any = true
 warn_unused_ignores = true
 explicit_package_bases = true
-mypy_path = ["src", "scripts"]
-exclude = []
+mypy_path = ["src"]
+exclude = ["^tests/"]
 # Optional deps not always installed in CI or dev environments.
 [[tool.mypy.overrides]]
 module = ["fitz", "tiktoken", "ocrmypdf", "textual", "textual.*", "rich", "rich.*"]

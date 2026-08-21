@@ -9,6 +9,13 @@ venv/
 .env/
 .env
 .env.*
+!.env.example
+!.env.*.example
+!.env.sample
+!.env.template
+secrets.local.*
+credentials.local.*
+.npmrc.local
 .direnv/
 .envrc
 
@@ -44,7 +51,6 @@ pytest.xml
 # Frontend test and browser artifacts
 /frontend/coverage/
 /frontend/test-results/
-/frontend/playwright-report/
 /frontend/blob-report/
 
 # Logs
@@ -105,6 +111,7 @@ node_modules/
 *.key
 *.p12
 *.pfx
+*.jks
 *.keystore
 credentials.json
 service-account*.json
@@ -113,6 +120,7 @@ secrets.yml
 .secrets/
 
 # Editors/OS
+/.mcp.json
 .vscode/
 .idea/
 .DS_Store
@@ -151,7 +159,12 @@ Desktop.ini
 /.aider/
 /.aider.*
 /.codex/
-/.codacy/
+/.codacy/*
+!/.codacy/codacy.config.json
+!/.codacy/codacy.yaml
+!/.codacy/codacy.yml
+/.codacy/codacy.config.json
+/.codacy/codacy.yaml
 /.codegraph/
 /.continue/
 /.serena/
@@ -161,6 +174,10 @@ Desktop.ini
 /.github/copilot-instructions.md
 /.github/prompts/
 /AGENTS.md
+/CLAUDE.md
+/GEMINI.md
+/AUDIT_LEDGER.md
+/plan.md
 /HARNESS_PRINCIPLES.md
 /PROMPTS.local.md
 /code_review.md
@@ -183,3 +200,36 @@ Desktop.ini
 /archive/
 /status.md
 /scripts/topology_inventory.sh
+
+# Nested local tooling and generated artifacts
+.agents/
+.codex/
+.codegraph/
+.serena/
+.repowise/
+blob-report/
+junit*.xml
+target/
+.build/
+DerivedData/
+xcuserdata/
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.local.db
+
+# Generated test and coverage output (local only)
+/coverage/
+/htmlcov/
+/.coverage
+/.coverage.*
+/.pytest_cache/
+/test-results/
+/playwright-report/
+/blob-report/
+/coverage.xml
+/junit.xml
+/junit-*.xml
