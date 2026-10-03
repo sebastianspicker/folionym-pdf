@@ -57,7 +57,7 @@ class PreviewRequest(BaseModel):
     source_kind: Literal["directory", "file"]
     path: str = Field(min_length=1)
     settings: UISettingsPayload
-    acknowledge_external_endpoint: bool = False
+    acknowledge_external_endpoint: str = ""
 
 
 class ApplyRequest(BaseModel):

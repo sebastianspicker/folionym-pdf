@@ -39,7 +39,7 @@ def test_backups_keep_occupied_names_private_bytes_and_clean_failed_copies(
     def fail_copy(*_args: object) -> None:
         raise OSError("forced backup copy failure")
 
-    monkeypatch.setattr(backups, "_copy_file_to_fd", fail_copy)
+    monkeypatch.setattr(backups, "_copy_fd_to_fd", fail_copy)
     with pytest.raises(OSError, match="forced backup copy failure"):
         apply_single_rename(second, "second-renamed", RenameApplyOptions(backup_dir=tmp_path / "failed-backups"))
     assert not (tmp_path / "failed-backups" / second.name).exists()

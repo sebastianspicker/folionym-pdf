@@ -98,7 +98,8 @@ def fake_fitz(monkeypatch: pytest.MonkeyPatch) -> Callable[[Any], Any]:
     """Return an installer that makes ``import fitz`` open the given document for any path."""
 
     def install(document: Any) -> Any:
-        monkeypatch.setitem(sys.modules, "fitz", SimpleNamespace(open=lambda _path: document))
+        monkeypatch.setitem(sys.modules, "fitz", SimpleNamespace(open=lambda *_args, **_kwargs: document))
+        monkeypatch.setattr("folionym.extraction.pdf.read_regular_file_no_follow", lambda _path: b"%PDF-1.7")
         return document
 
     return install

@@ -17,13 +17,13 @@ def test_depth_limit_prunes_scans_without_changing_pdf_filters(tmp_path: Path, m
     (deep / "deep.pdf").touch()
     (tmp_path / "linked.pdf").symlink_to(tmp_path / "root.PDF")
     scanned: list[Path] = []
-    original = discovery.os.scandir
+    original = discovery.open_directory_no_follow
 
     def scan(path: Path):
         scanned.append(path)
         return original(path)
 
-    monkeypatch.setattr(discovery.os, "scandir", scan)
+    monkeypatch.setattr(discovery, "open_directory_no_follow", scan)
     result = discovery.collect_pdf_files(
         tmp_path,
         discovery.PdfCollectionOptions(
@@ -61,6 +61,36 @@ def test_directory_pdf_count_matches_depth_one_discovery_and_ignores_symlinks(tm
     assert discovery.count_directory_pdfs(tmp_path) == 2
     assert discovery.count_directory_pdfs(tmp_path) == len(discovery.collect_pdf_files(tmp_path))
     assert discovery.count_directory_pdfs(tmp_path / "missing") == 0
+
+
+@pytest.mark.skipif(not hasattr(discovery.os, "O_NOFOLLOW"), reason="requires no-follow directory opens")
+def test_recursive_discovery_rejects_a_child_replaced_by_a_symlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    child = tmp_path / "child"
+    child.mkdir()
+    (child / "inside.pdf").write_bytes(b"%PDF")
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    outside_pdf = outside / "outside.pdf"
+    outside_pdf.write_bytes(b"private")
+    original = discovery.open_directory_no_follow
+    replaced = False
+
+    def replace_before_descent(path: Path) -> int:
+        nonlocal replaced
+        if path == child and not replaced:
+            replaced = True
+            child.rename(tmp_path / "original-child")
+            child.symlink_to(outside, target_is_directory=True)
+        return original(path)
+
+    monkeypatch.setattr(discovery, "open_directory_no_follow", replace_before_descent)
+
+    found = discovery.collect_pdf_files(tmp_path, discovery.PdfCollectionOptions(recursive=True))
+
+    assert outside_pdf not in found
+    assert all(path.name != "outside.pdf" for path in found)
 
 
 def test_child_directories_are_visible_sorted_and_not_symlinks(tmp_path: Path) -> None:

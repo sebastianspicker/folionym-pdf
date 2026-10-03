@@ -222,6 +222,14 @@ def _perform_exact_rename(item: PreviewItem, config: RenamerConfig, output: Rena
                 on_success=on_success,
                 max_filename_chars=config.output.naming.max_filename_chars,
                 exact_target=True,
+                expected_source_identity=(
+                    item.fingerprint.device,
+                    item.fingerprint.inode,
+                    item.fingerprint.size,
+                    item.fingerprint.modified_ns,
+                )
+                if item.fingerprint is not None
+                else None,
             ),
         )
         if success:

@@ -159,8 +159,10 @@ Folionym has two deliberate apply policies:
   receive a numeric suffix.
 - **Exact reviewed.** Browser and directory-TUI plans apply the exact target you
   reviewed. Apply rechecks source identity, selected duplicates, and target
-  availability, then fails on a conflict instead of quietly choosing another
-  name.
+  availability at the filesystem mutation boundary, then fails on a conflict
+  instead of quietly choosing another name. On POSIX, backup and copy fallbacks
+  continue reading the verified source descriptor rather than reopening its
+  pathname.
 
 A few consequences worth knowing:
 

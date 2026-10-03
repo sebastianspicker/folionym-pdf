@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..infrastructure.files import private_regular_file_snapshot, read_regular_file_no_follow
 from ..infrastructure.tokens import count_tokens
 from ..settings.environment import ENV_OCR_LANG
 from ..settings.models import (
@@ -166,7 +167,7 @@ def _close_document(doc: Any) -> None:
 def _open_pdf_for_text(fitz: Any, path: Path) -> Any:
     """Open a PDF for text extraction and normalize expected failures to OSError."""
     try:
-        return fitz.open(path)
+        return fitz.open(stream=read_regular_file_no_follow(path), filetype="pdf")
     except (RuntimeError, OSError, ValueError) as exc:
         raise OSError(f"Could not open PDF file {path.name}: {exc}") from exc
 
@@ -254,7 +255,7 @@ def _vision_render_payload(rendered: tuple[bytes, str] | None) -> dict[str, str]
 def _open_pdf_for_vision(fitz: Any, path: Path) -> Any | None:
     """Open a PDF for vision rendering, returning None on expected failures."""
     try:
-        return fitz.open(path)
+        return fitz.open(stream=read_regular_file_no_follow(path), filetype="pdf")
     except (RuntimeError, OSError, ValueError) as exc:
         logger.debug("Could not open PDF for vision render %s: %s", path.name, exc)
         return None
@@ -420,34 +421,33 @@ def pdf_to_text_with_ocr(  # noqa: PLR0913 - stable adapter keeps independent ex
     ocrmypdf and system Tesseract. Falls back to non-OCR extraction on
     missing dependency or OCR failure.
     """
-    text = _initial_text_for_ocr(
-        filepath,
-        max_tokens=max_tokens,
-        max_pages=max_pages,
-        read_all_pages=read_all_pages,
-    )
-    if not _should_attempt_ocr(filepath, text, min_chars_for_ocr=min_chars_for_ocr):
-        return text
-    ocrmypdf = _ocrmypdf_module_or_none()
-    if ocrmypdf is None:
-        return text
-
     if filepath is None:
-        return text
+        return ""
     path = Path(filepath)
-    if not path.exists() or not path.is_file():
-        return text
-    return _ocr_text_or_original(
-        ocrmypdf,
-        OcrExtractionRequest(
-            path=path,
-            original_text=text,
+    with private_regular_file_snapshot(path, suffix=".pdf") as snapshot:
+        text = _initial_text_for_ocr(
+            snapshot,
             max_tokens=max_tokens,
             max_pages=max_pages,
-            language=language,
             read_all_pages=read_all_pages,
-        ),
-    )
+        )
+        if not _should_attempt_ocr(snapshot, text, min_chars_for_ocr=min_chars_for_ocr):
+            return text
+        ocrmypdf = _ocrmypdf_module_or_none()
+        if ocrmypdf is None:
+            return text
+        return _ocr_text_or_original(
+            ocrmypdf,
+            OcrExtractionRequest(
+                path=snapshot,
+                original_text=text,
+                max_tokens=max_tokens,
+                max_pages=max_pages,
+                language=language,
+                read_all_pages=read_all_pages,
+            ),
+            source_path=path,
+        )
 
 
 def _initial_text_for_ocr(
@@ -496,6 +496,8 @@ def _ocrmypdf_module_or_none() -> Any | None:
 def _ocr_text_or_original(
     ocrmypdf: Any,
     request: OcrExtractionRequest,
+    *,
+    source_path: Path | None = None,
 ) -> str:
     """Run OCR and return its text, falling back to the original extraction on expected failures."""
     tmp = None
@@ -504,7 +506,7 @@ def _ocr_text_or_original(
         _run_ocr_to_temp(ocrmypdf, request.path, tmp, language=request.language)
         text_ocr = _extract_ocr_temp_text(
             tmp,
-            request.path,
+            source_path or request.path,
             max_tokens=request.max_tokens,
             max_pages=request.max_pages,
             read_all_pages=request.read_all_pages,
@@ -521,7 +523,7 @@ def _ocr_text_or_original(
 def _create_ocr_temp_path() -> Path:
     """Create a temporary PDF path for OCRmyPDF output."""
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False, prefix="folionym_ocr_") as f:
-        return Path(f.name)
+        return Path(f.name).resolve(strict=True)
 
 
 def _run_ocr_to_temp(ocrmypdf: Any, path: Path, tmp: Path, *, language: str) -> None:
@@ -590,7 +592,7 @@ def get_pdf_metadata(filepath: str | Path | None) -> dict[str, object]:
 def _open_pdf_for_metadata(fitz: Any, path: Path) -> Any | None:
     """Open a PDF for metadata, returning None and debug-logging expected failures."""
     try:
-        return fitz.open(path)
+        return fitz.open(stream=read_regular_file_no_follow(path), filetype="pdf")
     except (RuntimeError, OSError, ValueError) as exc:
         logger.debug("Could not open PDF for metadata %s: %s", path, exc)
         return None
@@ -667,7 +669,8 @@ def render_first_page_thumbnail(
     try:
         import fitz
 
-        with fitz.open(path) as document:
+        data = read_regular_file_no_follow(Path(path))
+        with fitz.open(stream=data, filetype="pdf") as document:
             if document.page_count < 1:
                 raise PageRenderError("No page preview is available.")
             page = document.load_page(0)

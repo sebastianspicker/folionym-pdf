@@ -62,6 +62,36 @@ def test_valid_directory_preview_start_saves_ui_settings(tmp_path: Path, monkeyp
     assert saved[0]["directory"] == str(tmp_path)
 
 
+def test_review_table_treats_filename_markup_and_controls_as_literal_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(tui, "_load_settings", lambda: {"directory": str(tmp_path), "use_llm": False})
+    monkeypatch.setattr(tui, "_save_settings", lambda _settings: None)
+    item = PreviewItem(
+        "one",
+        tmp_path / "[conceal]bad\x1b[2J.pdf",
+        "[red]proposal",
+        {},
+        PreviewStatus.READY,
+        True,
+        None,
+    )
+    plan = PreviewPlan("plan", tmp_path, "directory", RenamerConfig(), (item,), datetime.now(UTC))
+
+    async def exercise() -> None:
+        app = tui.FolionymTUI()
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.pause()
+            app.post_message(_PreviewFinished(plan, complete=True))
+            await pilot.pause()
+            row = app.query_one("#preview-table", DataTable).get_row_at(0)
+            assert row[1].plain == "[conceal]bad\\x1b[2J.pdf"
+            assert row[2].plain == "[red]proposal.pdf"
+            assert "\x1b" not in row[1].plain
+
+    asyncio.run(exercise())
+
+
 def test_single_file_rename_counts_its_structured_outcome(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_pdf: Callable[..., Path], invoice_text: str
 ) -> None:

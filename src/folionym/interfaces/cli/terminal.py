@@ -25,6 +25,7 @@ from ...application.batch import (
 )
 from ...application.proposals import ProgressCallback
 from ...application.watch import WatchHooks, run_watch_loop
+from ...infrastructure.display import escape_terminal_text
 from ...infrastructure.filenames import sanitize_filename_base
 from ...naming.rules import ProcessingRules
 from ...settings import RenamerConfig
@@ -59,7 +60,9 @@ def _interactive_rename_prompt(
     current_target = target
     while True:
         try:
-            prompt = f"Rename '{file_path.name}' to '{current_target.name}'? (y/n/e=edit, default y): "
+            source_name = escape_terminal_text(file_path.name)
+            target_name = escape_terminal_text(current_target.name)
+            prompt = f"Rename '{source_name}' to '{target_name}'? (y/n/e=edit, default y): "
             reply = input(prompt).strip().lower() or "y"
         except EOFError, KeyboardInterrupt:
             return ("n", current_base)
@@ -85,10 +88,10 @@ def make_confirm(config: RenamerConfig) -> ConfirmCallback:
     def confirm(file_path: Path, new_base: str, meta: dict[str, object]) -> str | None:
         target = file_path.with_name(new_base + file_path.suffix)
         if manual_mode:
-            print(f"Suggested: {new_base}{file_path.suffix}")
+            print(f"Suggested: {escape_terminal_text(new_base + file_path.suffix)}")
             for key, value in meta.items():
                 if key in _MANUAL_META_KEYS and value:
-                    print(f"  {key}: {value}")
+                    print(f"  {key}: {escape_terminal_text(value)}")
         reply, base = _interactive_rename_prompt(
             file_path, target, new_base, edit_default_base=new_base if manual_mode else None
         )
@@ -111,7 +114,7 @@ def make_progress(config: RenamerConfig) -> ProgressFactory | None:
         columns.extend(
             [
                 TextColumn("{task.percentage:>3.0f}%"),
-                TextColumn("{task.fields[filename]}"),
+                TextColumn("{task.fields[filename]}", markup=False),
                 TimeElapsedColumn(),
             ]
         )
@@ -119,7 +122,12 @@ def make_progress(config: RenamerConfig) -> ProgressFactory | None:
         task_id = progress.add_task("Processing PDFs", total=total, filename="")
 
         def update(current: int, total: int, file_path: Path) -> None:
-            progress.update(task_id, total=total, completed=current, filename=file_path.name)
+            progress.update(
+                task_id,
+                total=total,
+                completed=current,
+                filename=escape_terminal_text(file_path.name),
+            )
 
         progress.start()
         try:

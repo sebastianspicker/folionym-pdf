@@ -118,7 +118,9 @@ protection.
 These controls do not turn the service into a remote authentication system. A
 non-loopback LLM endpoint or post-rename hook can receive document-derived
 content. The browser requires acknowledgement before the first Preview for each
-external endpoint. See [SECURITY.md](../SECURITY.md).
+external endpoint in each server process. The acknowledgement is bound to the
+exact resolved endpoint and is never saved in shared UI settings. See
+[SECURITY.md](../SECURITY.md).
 
 The browser and TUI share `~/.folionym_ui.json`; on POSIX, the application uses
 owner-only writes where supported. An existing `~/.folionym_tui.json` is

@@ -36,6 +36,7 @@ except ImportError as _error:  # pragma: no cover
 
 from ...application.models import ApplyStatus, PreviewPlan, PreviewStatus
 from ...application.reviewed_plan import apply_reviewed_plan, create_preview_plan
+from ...infrastructure.display import escape_terminal_text
 from ...infrastructure.logging import setup_logging
 from ...settings import RenamerConfig
 from ..ui_settings import (
@@ -191,7 +192,8 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
         """Invalidate a reviewed plan whenever a source or text setting changes."""
         if message.input.id == "directory":
             with contextlib.suppress(QueryError):
-                self.query_one("#current-scope", Static).update(message.value.strip() or "No folder selected")
+                scope = escape_terminal_text(message.value.strip() or "No folder selected")
+                self.query_one("#current-scope", Static).update(Text(scope))
         self._invalidate_for_control(message.input.id)
 
     @on(Checkbox.Changed)
@@ -225,7 +227,8 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
 
     def _set_apply_guidance(self, message: str) -> None:
         with contextlib.suppress(QueryError):
-            self.query_one("#run-guidance", Static).update(f"[b]REVIEWED APPLY[/b]  {_escape_markup(message)}")
+            safe_message = _escape_markup(escape_terminal_text(message))
+            self.query_one("#run-guidance", Static).update(f"[b]REVIEWED APPLY[/b]  {safe_message}")
 
     def _clear_preview_table(self) -> None:
         with contextlib.suppress(QueryError):
@@ -247,8 +250,8 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
         for row in rows:
             table.add_row(
                 Text(row.status, style=colors.get(row.status, "")),
-                row.source_name,
-                row.proposed_name,
+                Text(escape_terminal_text(row.source_name)),
+                Text(escape_terminal_text(row.proposed_name)),
                 key=row.item_id,
             )
         table.display = True
@@ -260,16 +263,21 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
         if plan is None or not 0 <= index < len(plan.items):
             return
         item = plan.items[index]
-        self.query_one("#inspector-source", Static).update(_escape_markup(item.source.name))
+        self.query_one("#inspector-source", Static).update(Text(escape_terminal_text(item.source.name)))
         self.query_one("#inspector-proposed", Static).update(
-            f"[b]{_escape_markup(item.proposed_name or 'No reviewed filename')}[/b]"
+            Text(escape_terminal_text(item.proposed_name or "No reviewed filename"), style="bold")
         )
-        self.query_one("#inspector-mode", Static).update(item.reason or item.status.value.upper())
+        self.query_one("#inspector-mode", Static).update(
+            Text(escape_terminal_text(item.reason or item.status.value.upper()))
+        )
 
     def _progress_from_worker(self, current: int, total: int, source: Path) -> None:
         progress = self.query_one("#run-progress", ProgressBar)
         progress.update(total=max(1, total), progress=current)
-        self._set_status(f"Processing {current}/{total}: {source.name}", "status-running")
+        self._set_status(
+            f"Processing {current}/{total}: {escape_terminal_text(source.name)}",
+            "status-running",
+        )
         self.query_one("#run-file-counter", Static).update(f"{current} of {total} files")
         self.query_one("#metric-files", Static).update(f"[b]{total}[/b] PDFs")
 
@@ -324,7 +332,8 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
         }
         prefix = indicators.get(css_class, "")
         status = self.query_one("#run-status", Static)
-        status.update(f"{prefix}  {text}" if prefix else text)
+        safe_text = _escape_markup(escape_terminal_text(text))
+        status.update(f"{prefix}  {safe_text}" if prefix else safe_text)
         for candidate in indicators:
             status.remove_class(candidate)
         status.add_class(css_class)
@@ -394,7 +403,10 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
         for item in report.items:
             target = item.target_name or "no target"
             detail = item.reason or item.status.value
-            log.write(f"[dim]{_escape_markup(item.source_name)}[/dim] → [b]{_escape_markup(target)}[/b]  {detail}")
+            source_text = _escape_markup(escape_terminal_text(item.source_name))
+            target_text = _escape_markup(escape_terminal_text(target))
+            detail_text = _escape_markup(escape_terminal_text(detail))
+            log.write(f"[dim]{source_text}[/dim] → [b]{target_text}[/b]  {detail_text}")
         self._reviewed_plan.clear()
         if cancelled:
             self._set_status("Apply cancelled; completed exact targets are shown below.", "status-cancel")

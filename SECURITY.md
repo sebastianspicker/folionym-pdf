@@ -59,6 +59,9 @@ direct PDF counts to the local browser, not PDF contents.
 The browser frontend does not make a configured non-loopback model endpoint
 local. Before the first Preview for each exact external endpoint, it asks the
 operator to acknowledge that document-derived content may leave the machine.
+That acknowledgement is bound to the normalized endpoint and kept only in the
+current server process; it is not restored from browser or TUI settings after a
+restart.
 
 ## Input and resource boundaries
 
@@ -66,6 +69,20 @@ Folionym processes PDFs and invokes optional native PDF and OCR tooling with the
 current user's operating-system permissions. It does not sandbox parsers or OCR
 processes. Use documents from a trusted source or an isolated account when the
 input may be hostile.
+
+On platforms with POSIX no-follow and descriptor-relative file operations,
+recursive discovery rejects substituted directory links, PDF parsing reads a
+verified regular-file identity (using a private snapshot where a native tool
+requires a pathname), and reviewed Apply retains the approved source descriptor
+through backup and rename/copy work. Metadata replacement keeps its private
+temporary descriptor through serialization and permission changes. Windows uses
+the closest available no-follow and identity checks, but its pathname mutation
+APIs do not provide the same descriptor-relative guarantees; avoid concurrently
+writable input directories there.
+
+Filenames and document-derived values are escaped before plain terminal/log
+rendering, and Textual receives literal Rich text for reviewed names. The raw
+filesystem names are preserved internally.
 
 The alpha has no hard input-byte limit, no maximum worker count, and no
 application-level OCR timeout. Page extraction is unlimited unless

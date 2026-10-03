@@ -14,8 +14,11 @@ from folionym.interfaces.ui_settings import (
     build_config_from_ui_settings,
     load_ui_settings,
     merged_ui_settings,
+    save_ui_settings,
 )
 from folionym.interfaces.web.schema import UISettingsPayload
+
+_REMOTE_URL = "https://llm.remote.example/v1/completions"
 
 
 def test_ui_settings_defaults_schema_and_legacy_migration_share_one_contract(tmp_path) -> None:
@@ -63,6 +66,26 @@ def test_legacy_or_invalid_persisted_browser_choices_are_normalized() -> None:
     assert normalized["language"] == DEFAULT_UI_SETTINGS["language"]
     assert normalized["case"] == DEFAULT_UI_SETTINGS["case"]
     assert normalized["date_format"] == DEFAULT_UI_SETTINGS["date_format"]
+
+
+def test_external_endpoint_acknowledgement_is_never_persisted_or_restored(tmp_path) -> None:
+    settings_path = tmp_path / ".folionym_ui.json"
+    legacy_path = tmp_path / ".folionym_tui.json"
+    save_ui_settings(
+        {"language": "en", "acknowledged_external_endpoint": _REMOTE_URL},
+        settings_path=settings_path,
+    )
+
+    stored = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert stored == {"language": "en", "acknowledged_external_endpoint": ""}
+
+    settings_path.write_text(
+        json.dumps({"language": "en", "acknowledged_external_endpoint": _REMOTE_URL}),
+        encoding="utf-8",
+    )
+    loaded = load_ui_settings(settings_path, legacy_path=legacy_path)
+    assert loaded == {"language": "en", "acknowledged_external_endpoint": ""}
+    assert merged_ui_settings({"acknowledged_external_endpoint": _REMOTE_URL})["acknowledged_external_endpoint"] == ""
 
 
 @pytest.mark.parametrize(

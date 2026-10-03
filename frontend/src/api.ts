@@ -70,7 +70,7 @@ const localApi = {
     sourceKind: "directory" | "file",
     path: string,
     settings: Settings,
-    acknowledge = false,
+    acknowledgedEndpoint = "",
   ) =>
     request<{ run_id: string }>(
       "/api/v1/previews",
@@ -78,7 +78,7 @@ const localApi = {
         source_kind: sourceKind,
         path,
         settings,
-        acknowledge_external_endpoint: acknowledge,
+        acknowledge_external_endpoint: acknowledgedEndpoint,
       }),
     ),
   run: (id: string) => request<Run>(`/api/v1/runs/${id}`),
@@ -112,13 +112,13 @@ export const api = {
     sourceKind: "directory" | "file",
     path: string,
     settings: Settings,
-    acknowledge = false,
+    acknowledgedEndpoint = "",
   ) =>
     isDemo
       ? loadDemoApi().then((client) =>
-          client.startPreview(sourceKind, path, settings, acknowledge),
+          client.startPreview(sourceKind, path, settings, acknowledgedEndpoint),
         )
-      : localApi.startPreview(sourceKind, path, settings, acknowledge),
+      : localApi.startPreview(sourceKind, path, settings, acknowledgedEndpoint),
   run: (id: string) =>
     isDemo ? loadDemoApi().then((client) => client.run(id)) : localApi.run(id),
   cancel: (id: string) =>

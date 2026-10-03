@@ -11,29 +11,34 @@ import sys
 from pathlib import Path
 
 from ...application.undo import UndoOutcome, UndoOutcomeKind, UndoSkipReason, undo_rename_log
+from ...infrastructure.display import escape_terminal_text
 
 
 def _report(outcome: UndoOutcome) -> None:
     """Print one undo outcome using the established stdout/stderr messages."""
+    old = escape_terminal_text(outcome.old)
+    new = escape_terminal_text(outcome.new)
+    reason = escape_terminal_text(outcome.reason)
+    subject = escape_terminal_text(outcome.subject)
     match outcome.kind:
         case UndoOutcomeKind.REVERTED:
-            print(f"Reverted: {outcome.new} -> {outcome.old}")
+            print(f"Reverted: {new} -> {old}")
         case UndoOutcomeKind.WOULD_REVERT:
-            print(f"Would revert: {outcome.new} -> {outcome.old}")
+            print(f"Would revert: {new} -> {old}")
         case UndoOutcomeKind.ERROR:
-            print(f"Error reverting {outcome.new}: {outcome.reason}", file=sys.stderr)
+            print(f"Error reverting {new}: {reason}", file=sys.stderr)
         case UndoOutcomeKind.SKIPPED:
             if outcome.reason == UndoSkipReason.CROSS_DIRECTORY:
-                print(f"Skip ({outcome.reason}): {outcome.new} -> {outcome.old}", file=sys.stderr)
+                print(f"Skip ({reason}): {new} -> {old}", file=sys.stderr)
             else:
-                print(f"Skip ({outcome.reason}): {outcome.subject}", file=sys.stderr)
+                print(f"Skip ({reason}): {subject}", file=sys.stderr)
 
 
 def run_undo(log_path: Path, dry_run: bool) -> None:
     """Read rename log and revert renames (LIFO). Caller must ensure log_path.exists()."""
     if not log_path.is_file():
         print(
-            f"Error: rename log path is not a file (e.g. directory): {log_path}",
+            f"Error: rename log path is not a file (e.g. directory): {escape_terminal_text(log_path)}",
             file=sys.stderr,
         )
         return
@@ -66,9 +71,9 @@ def main(argv: list[str] | None = None) -> None:
     args = ap.parse_args(argv)
     log_path = Path(args.rename_log)
     if not log_path.exists():
-        print(f"Error: log file not found: {log_path}", file=sys.stderr)
+        print(f"Error: log file not found: {escape_terminal_text(log_path)}", file=sys.stderr)
         sys.exit(1)
     if not log_path.is_file():
-        print(f"Error: log path is not a file: {log_path}", file=sys.stderr)
+        print(f"Error: log path is not a file: {escape_terminal_text(log_path)}", file=sys.stderr)
         sys.exit(1)
     run_undo(log_path, args.dry_run)

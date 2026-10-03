@@ -65,6 +65,13 @@ _VALID_UI_CASES = frozenset(DESIRED_CASE_CHOICES)
 _VALID_UI_DATE_FORMATS = frozenset(DATE_LOCALE_CHOICES)
 
 
+def _without_external_endpoint_acknowledgement(data: UiSettingsSnapshot) -> UiSettingsSnapshot:
+    """Return settings with the legacy durable consent value cleared."""
+    if not data.get("acknowledged_external_endpoint"):
+        return data
+    return {**data, "acknowledged_external_endpoint": ""}
+
+
 def _read_settings(path: Path) -> UiSettingsSnapshot:
     """Read a JSON object from ``path`` or return an empty snapshot."""
     if not path.exists():
@@ -84,17 +91,18 @@ def load_ui_settings(
     """Load shared settings, migrating the legacy Textual file once when needed."""
     current = _read_settings(settings_path)
     if current or settings_path.exists():
-        return current
+        return _without_external_endpoint_acknowledgement(current)
     legacy = _read_settings(legacy_path)
     if not legacy:
         return {}
     save_ui_settings(legacy, settings_path=settings_path)
-    return legacy
+    return _without_external_endpoint_acknowledgement(legacy)
 
 
 def merged_ui_settings(data: UiSettingsSnapshot | None = None) -> UiSettingsSnapshot:
     """Overlay persisted values on the complete interactive settings defaults."""
     merged = {**DEFAULT_UI_SETTINGS, **(data or {})}
+    merged["acknowledged_external_endpoint"] = ""
     if merged["language"] not in _VALID_UI_LANGUAGES:
         merged["language"] = DEFAULT_UI_SETTINGS["language"]
     if merged["case"] == "snake_case":
@@ -109,7 +117,8 @@ def merged_ui_settings(data: UiSettingsSnapshot | None = None) -> UiSettingsSnap
 def save_ui_settings(data: UiSettingsSnapshot, *, settings_path: Path = SETTINGS_PATH) -> None:
     """Atomically persist owner-only settings without disabling the interactive UI on I/O failure."""
     try:
-        atomic_write_private_text(settings_path, json.dumps(data, indent=2, ensure_ascii=False))
+        safe_data = _without_external_endpoint_acknowledgement(data)
+        atomic_write_private_text(settings_path, json.dumps(safe_data, indent=2, ensure_ascii=False))
     except OSError:
         logger.debug("Could not save shared UI settings", exc_info=True)
 

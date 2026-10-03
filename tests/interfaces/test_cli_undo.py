@@ -51,7 +51,14 @@ def test_undo_does_not_overwrite_a_destination_created_after_preflight(
     log = tmp_path / "rename.log"
     log.write_text(f"{original}\t{renamed}\n", encoding="utf-8")
 
-    def collide(_source: Path, target: Path, _identity: os.stat_result) -> os.stat_result | None:
+    def collide(
+        _source: Path,
+        target: Path,
+        _identity: os.stat_result,
+        *,
+        directory_fd: int,
+    ) -> os.stat_result | None:
+        del directory_fd
         target.write_bytes(b"racer")
         raise FileExistsError(f"Target already exists: {target}")
 

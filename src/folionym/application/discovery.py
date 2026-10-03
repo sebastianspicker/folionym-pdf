@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..infrastructure.files import is_path_within
+from ..infrastructure.files import is_path_within, open_directory_no_follow
 from ..naming.rules import ProcessingRules, load_processing_rules, should_skip_file_by_rules
 from ..settings import RenamerConfig
 
@@ -44,20 +44,30 @@ def _scan_pdf_candidates(directory: Path, opts: PdfCollectionOptions) -> Iterato
     while pending:
         folder, depth = pending.pop()
         children: list[tuple[Path, int]] = []
+        directory_fd: int | None = None
         try:
-            with os.scandir(folder) as entries:
+            directory_fd = open_directory_no_follow(folder)
+            scan_target: int | Path = directory_fd if os.name != "nt" else folder
+            with os.scandir(scan_target) as entries:
                 for entry in entries:
                     if entry.is_symlink():
                         continue
-                    path = Path(entry.path)
+                    path = folder / entry.name
                     if entry.is_dir(follow_symlinks=False):
                         if opts.recursive and (opts.max_depth <= 0 or depth < opts.max_depth):
                             children.append((path, depth + 1))
-                    elif not entry.name.startswith(".") and path.suffix.lower() == ".pdf" and entry.is_file():
+                    elif (
+                        not entry.name.startswith(".")
+                        and path.suffix.lower() == ".pdf"
+                        and entry.is_file(follow_symlinks=False)
+                    ):
                         yield path
         except OSError:
             if not opts.recursive:
                 raise
+        finally:
+            if directory_fd is not None:
+                os.close(directory_fd)
         pending.extend(reversed(children))
 
 

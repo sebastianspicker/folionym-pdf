@@ -146,7 +146,7 @@ export const demoApi = {
     sourceKind: "directory" | "file",
     path: string,
     _settings: Settings,
-    _acknowledge = false,
+    _acknowledgedEndpoint = "",
   ) => {
     const templateItems =
       sourceKind === "file" ? demoPlan.items.slice(0, 1) : demoPlan.items;

@@ -10,6 +10,9 @@ import stat
 from collections.abc import Callable
 from pathlib import Path
 
+from ..infrastructure.files import open_directory_no_follow, open_regular_file_no_follow
+from .options import ExpectedSourceIdentity
+
 _OWNER_ONLY_FILE_MODE = stat.S_IRUSR | stat.S_IWUSR
 
 
@@ -22,15 +25,25 @@ def _open_exclusive_target(path: Path | str, *, mode: int = _OWNER_ONLY_FILE_MOD
     return os.open(path, flags, mode, **kwargs)
 
 
-def _copy_file_to_fd(file_path: Path, target_fd: int) -> os.stat_result:
-    """Copy content and portable metadata through an already-reserved descriptor."""
-    with file_path.open("rb") as source, os.fdopen(os.dup(target_fd), "wb") as target_file:
-        source_status = os.fstat(source.fileno())
+def _copy_fd_to_fd(source_fd: int, target_fd: int) -> os.stat_result:
+    """Copy content and portable metadata from an already-verified descriptor."""
+    os.lseek(source_fd, 0, os.SEEK_SET)
+    with os.fdopen(os.dup(source_fd), "rb") as source, os.fdopen(os.dup(target_fd), "wb") as target_file:
+        source_status = os.fstat(source_fd)
         shutil.copyfileobj(source, target_file)
     if os.name != "nt":
         os.fchmod(target_fd, stat.S_IMODE(source_status.st_mode))
         os.utime(target_fd, ns=(source_status.st_atime_ns, source_status.st_mtime_ns))
     return source_status
+
+
+def _copy_file_to_fd(file_path: Path, target_fd: int) -> os.stat_result:
+    """Securely open a regular path once, then copy from its descriptor."""
+    source_fd = open_regular_file_no_follow(file_path)
+    try:
+        return _copy_fd_to_fd(source_fd, target_fd)
+    finally:
+        os.close(source_fd)
 
 
 def _directory_entry_matches_identity(name: str, directory_fd: int, identity: os.stat_result) -> bool:
@@ -60,6 +73,17 @@ def _identity_matches(path_status: os.stat_result, identity: os.stat_result) -> 
     )
 
 
+def _stable_file_identity(identity: os.stat_result) -> tuple[int, int, int, int, int]:
+    """Return fields that expose replacement or in-place mutation."""
+    return (
+        identity.st_dev,
+        identity.st_ino,
+        identity.st_size,
+        identity.st_mtime_ns,
+        identity.st_ctime_ns,
+    )
+
+
 def _cleanup_reserved_directory_entry(name: str, directory_fd: int, identity: os.stat_result) -> None:
     """Best-effort unlink only when the directory entry identity remains ours."""
     if _directory_entry_matches_identity(name, directory_fd, identity):
@@ -74,29 +98,101 @@ def _cleanup_reserved_target(target: Path, identity: os.stat_result) -> None:
             target.unlink()
 
 
-def _rename_without_overwrite(file_path: Path, target: Path) -> None:
+def _identity_matches_expected(identity: os.stat_result, expected: ExpectedSourceIdentity | None) -> bool:
+    """Return whether a descriptor still identifies the exact reviewed bytes."""
+    if expected is None:
+        return True
+    return (identity.st_dev, identity.st_ino, identity.st_size, identity.st_mtime_ns) == expected
+
+
+def _validate_expected_identity(
+    identity: os.stat_result,
+    expected: ExpectedSourceIdentity | None,
+    file_path: Path,
+) -> None:
+    """Reject a source descriptor that does not match its reviewed identity."""
+    if not _identity_matches_expected(identity, expected):
+        raise OSError(errno.ESTALE, f"Source changed after Preview: {file_path}")
+
+
+def _rename_without_overwrite(
+    file_path: Path,
+    target: Path,
+    source_fd: int | None = None,
+    *,
+    expected_identity: ExpectedSourceIdentity | None = None,
+) -> None:
     """Rename through Windows rename, a hard link, or an exclusive-copy fallback."""
     if os.name == "nt":
+        verification_fd = open_regular_file_no_follow(file_path)
+        try:
+            _validate_expected_identity(os.fstat(verification_fd), expected_identity, file_path)
+        finally:
+            os.close(verification_fd)
         os.rename(file_path, target)
         return
-    source_fd = os.open(file_path, os.O_RDONLY)
+    owns_source_fd = source_fd is None
+    if source_fd is None:
+        source_fd = open_regular_file_no_follow(file_path)
+    directory_fd = -1
     try:
+        directory_fd = open_directory_no_follow(file_path.parent)
         source_identity = os.fstat(source_fd)
-        linked_identity = _try_hard_link_without_overwrite(file_path, target, source_identity)
+        _validate_expected_identity(source_identity, expected_identity, file_path)
+        if not _directory_entry_matches_identity(file_path.name, directory_fd, source_identity):
+            raise OSError(errno.ESTALE, f"Source path changed after Preview: {file_path}")
+        linked_identity = _try_hard_link_without_overwrite(
+            file_path,
+            target,
+            source_identity,
+            directory_fd=directory_fd,
+        )
         if linked_identity is None:
-            _copy_to_reserved_target_then_unlink(file_path, target, source_fd)
+            _copy_to_reserved_target_then_unlink(
+                file_path,
+                target,
+                source_fd,
+                expected_identity=expected_identity,
+                directory_fd=directory_fd,
+            )
             return
-        _validate_link_and_unlink_source(file_path, target, linked_identity)
+        linked_identity = os.fstat(source_fd)
+        try:
+            _validate_expected_identity(linked_identity, expected_identity, file_path)
+        except OSError:
+            _cleanup_reserved_directory_entry(target.name, directory_fd, linked_identity)
+            raise
+        _validate_link_and_unlink_source(
+            file_path,
+            target,
+            source_fd,
+            linked_identity,
+            expected_identity=expected_identity,
+            directory_fd=directory_fd,
+        )
     finally:
-        os.close(source_fd)
+        if directory_fd >= 0:
+            os.close(directory_fd)
+        if owns_source_fd:
+            os.close(source_fd)
 
 
 def _try_hard_link_without_overwrite(
-    file_path: Path, target: Path, source_identity: os.stat_result
+    file_path: Path,
+    target: Path,
+    source_identity: os.stat_result,
+    *,
+    directory_fd: int,
 ) -> os.stat_result | None:
     """Try a hard-link rename, retaining collision semantics on every platform."""
     try:
-        os.link(file_path, target)
+        os.link(
+            file_path.name,
+            target.name,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
     except (AttributeError, OSError) as exc:
         if isinstance(exc, OSError) and exc.errno == errno.EEXIST:
             raise FileExistsError from exc
@@ -104,36 +200,61 @@ def _try_hard_link_without_overwrite(
     return source_identity
 
 
-def _validate_link_and_unlink_source(file_path: Path, target: Path, source_identity: os.stat_result) -> None:
+def _validate_link_and_unlink_source(  # noqa: PLR0913 - pinned identities remain explicit
+    file_path: Path,
+    target: Path,
+    source_fd: int,
+    source_identity: os.stat_result,
+    *,
+    expected_identity: ExpectedSourceIdentity | None,
+    directory_fd: int,
+) -> None:
     """Validate both entries before removing a hard-link source pathname."""
-    if not _path_matches_identity(target, source_identity):
-        _cleanup_link_created_from_replaced_source(file_path, target)
+    if not _directory_entry_matches_identity(target.name, directory_fd, source_identity):
+        _cleanup_link_created_from_replaced_source(file_path, target, directory_fd=directory_fd)
         raise OSError(errno.EBUSY, f"Target path changed while linking: {target}")
-    if not _path_matches_identity(file_path, source_identity):
-        _cleanup_reserved_target(target, source_identity)
+    if not _directory_entry_matches_identity(file_path.name, directory_fd, source_identity):
+        _cleanup_reserved_directory_entry(target.name, directory_fd, source_identity)
         raise OSError(errno.EBUSY, f"Source path changed while linking: {file_path}")
+    current_identity = os.fstat(source_fd)
+    if _stable_file_identity(current_identity) != _stable_file_identity(source_identity):
+        _cleanup_reserved_directory_entry(target.name, directory_fd, source_identity)
+        raise OSError(errno.EBUSY, f"Source changed before removal: {file_path}")
     try:
-        file_path.unlink()
+        _validate_expected_identity(current_identity, expected_identity, file_path)
     except OSError:
-        _cleanup_reserved_target(target, source_identity)
+        _cleanup_reserved_directory_entry(target.name, directory_fd, source_identity)
+        raise
+    try:
+        os.unlink(file_path.name, dir_fd=directory_fd)
+    except OSError:
+        _cleanup_reserved_directory_entry(target.name, directory_fd, source_identity)
         raise
 
 
-def _cleanup_link_created_from_replaced_source(file_path: Path, target: Path) -> None:
+def _cleanup_link_created_from_replaced_source(file_path: Path, target: Path, *, directory_fd: int) -> None:
     """Remove a mismatched link only when it still aliases the current source."""
     try:
-        target_identity = target.lstat()
+        target_identity = os.stat(target.name, dir_fd=directory_fd, follow_symlinks=False)
     except OSError:
         return
-    if _path_matches_identity(file_path, target_identity):
-        _cleanup_reserved_target(target, target_identity)
+    if _directory_entry_matches_identity(file_path.name, directory_fd, target_identity):
+        _cleanup_reserved_directory_entry(target.name, directory_fd, target_identity)
 
 
-def _copy_to_reserved_target_then_unlink(file_path: Path, target: Path, source_fd: int | None = None) -> None:
+def _copy_to_reserved_target_then_unlink(
+    file_path: Path,
+    target: Path,
+    source_fd: int | None = None,
+    *,
+    expected_identity: ExpectedSourceIdentity | None = None,
+    directory_fd: int | None = None,
+) -> None:
     """Copy into an exclusive target while retaining the original source inode."""
     owns_source_fd = source_fd is None
+    owns_directory_fd = directory_fd is None and os.name != "nt"
     if source_fd is None:
-        source_fd = os.open(file_path, os.O_RDONLY)
+        source_fd = open_regular_file_no_follow(file_path)
 
     def release_windows_source() -> None:
         """Close the owned source descriptor before Windows removes its path."""
@@ -143,79 +264,176 @@ def _copy_to_reserved_target_then_unlink(file_path: Path, target: Path, source_f
             source_fd = None
 
     try:
+        if owns_directory_fd:
+            directory_fd = open_directory_no_follow(file_path.parent)
         _copy_with_pinned_source(
             file_path,
             target,
             source_fd,
             before_unlink=release_windows_source if owns_source_fd and os.name == "nt" else None,
+            expected_identity=expected_identity,
+            directory_fd=directory_fd,
         )
     finally:
+        if owns_directory_fd and directory_fd is not None:
+            os.close(directory_fd)
         if owns_source_fd and source_fd is not None:
             os.close(source_fd)
 
 
-def _copy_with_pinned_source(
-    file_path: Path, target: Path, source_fd: int, *, before_unlink: Callable[[], None] | None
+def _copy_with_pinned_source(  # noqa: PLR0913 - descriptor and reviewed identities stay explicit
+    file_path: Path,
+    target: Path,
+    source_fd: int,
+    *,
+    before_unlink: Callable[[], None] | None,
+    expected_identity: ExpectedSourceIdentity | None,
+    directory_fd: int | None,
 ) -> None:
     """Reserve, copy, validate, and unlink while the source inode is pinned."""
     held_identity = os.fstat(source_fd)
-    target_fd = _reserve_copy_target(target)
+    _validate_expected_identity(held_identity, expected_identity, file_path)
+    if directory_fd is not None and not _directory_entry_matches_identity(file_path.name, directory_fd, held_identity):
+        raise OSError(errno.ESTALE, f"Source path changed after Preview: {file_path}")
+    target_fd = _reserve_copy_target(target, directory_fd=directory_fd)
     try:
         target_identity = os.fstat(target_fd)
-        _copy_and_validate_reserved_target(file_path, target, target_fd, held_identity, target_identity)
-        _run_before_unlink(before_unlink, target, target_identity)
-        _unlink_copied_source(file_path, target, target_identity)
+        _copy_and_validate_reserved_target(
+            file_path,
+            target,
+            source_fd,
+            target_fd,
+            held_identity,
+            target_identity,
+            expected_identity=expected_identity,
+            directory_fd=directory_fd,
+        )
+        _run_before_unlink(
+            before_unlink,
+            target,
+            target_identity,
+            directory_fd=directory_fd,
+        )
+        _unlink_copied_source(
+            file_path,
+            target,
+            source_fd if before_unlink is None else None,
+            held_identity,
+            target_identity,
+            directory_fd=directory_fd,
+        )
     finally:
         os.close(target_fd)
 
 
-def _reserve_copy_target(target: Path) -> int:
+def _reserve_copy_target(target: Path, *, directory_fd: int | None) -> int:
     """Reserve a no-overwrite copy target and normalize collision errors."""
     try:
-        return _open_exclusive_target(target)
+        return _open_exclusive_target(target.name if directory_fd is not None else target, dir_fd=directory_fd)
     except OSError as open_exc:
         if open_exc.errno == errno.EEXIST:
             raise FileExistsError(f"Target already exists: {target}") from open_exc
         raise
 
 
-def _copy_and_validate_reserved_target(
+def _copy_and_validate_reserved_target(  # noqa: PLR0913 - both pinned identities remain explicit
     file_path: Path,
     target: Path,
+    source_fd: int,
     target_fd: int,
     source_identity: os.stat_result,
     target_identity: os.stat_result,
+    *,
+    expected_identity: ExpectedSourceIdentity | None,
+    directory_fd: int | None,
 ) -> None:
     """Copy only while the source and the exclusive target paths remain pinned."""
     try:
-        _copy_file_to_fd(file_path, target_fd)
+        _copy_fd_to_fd(source_fd, target_fd)
     except OSError:
-        _cleanup_reserved_target(target, target_identity)
+        _cleanup_copy_target(target, target_identity, directory_fd=directory_fd)
         raise
-    if not _path_matches_identity(target, target_identity):
+    copied_identity = os.fstat(source_fd)
+    if _stable_file_identity(copied_identity) != _stable_file_identity(source_identity):
+        _cleanup_copy_target(target, target_identity, directory_fd=directory_fd)
+        raise OSError(errno.EBUSY, f"Source changed while copying: {file_path}")
+    try:
+        _validate_expected_identity(copied_identity, expected_identity, file_path)
+    except OSError:
+        _cleanup_copy_target(target, target_identity, directory_fd=directory_fd)
+        raise
+    target_matches = (
+        _directory_entry_matches_identity(target.name, directory_fd, target_identity)
+        if directory_fd is not None
+        else _path_matches_identity(target, target_identity)
+    )
+    if not target_matches:
         raise OSError(errno.EBUSY, f"Target path changed while copying: {target}")
-    if not _path_matches_identity(file_path, source_identity):
-        _cleanup_reserved_target(target, target_identity)
+    source_matches = (
+        _directory_entry_matches_identity(file_path.name, directory_fd, source_identity)
+        if directory_fd is not None
+        else _path_matches_identity(file_path, source_identity)
+    )
+    if not source_matches:
+        _cleanup_copy_target(target, target_identity, directory_fd=directory_fd)
         raise OSError(errno.EBUSY, f"Source path changed while copying: {file_path}")
 
 
-def _run_before_unlink(before_unlink: Callable[[], None] | None, target: Path, target_identity: os.stat_result) -> None:
+def _run_before_unlink(
+    before_unlink: Callable[[], None] | None,
+    target: Path,
+    target_identity: os.stat_result,
+    *,
+    directory_fd: int | None,
+) -> None:
     """Run an optional pre-unlink hook and clean the owned target if it fails."""
     if before_unlink is None:
         return
     try:
         before_unlink()
     except OSError:
-        _cleanup_reserved_target(target, target_identity)
+        _cleanup_copy_target(target, target_identity, directory_fd=directory_fd)
         raise
 
 
-def _unlink_copied_source(file_path: Path, target: Path, target_identity: os.stat_result) -> None:
+def _unlink_copied_source(  # noqa: PLR0913 - descriptor and reserved identities stay explicit
+    file_path: Path,
+    target: Path,
+    source_fd: int | None,
+    source_identity: os.stat_result,
+    target_identity: os.stat_result,
+    *,
+    directory_fd: int | None,
+) -> None:
     """Unlink the validated source and clean the reservation if that fails."""
+    descriptor_matches = (
+        True
+        if source_fd is None
+        else _stable_file_identity(os.fstat(source_fd)) == _stable_file_identity(source_identity)
+    )
+    source_matches = (
+        _directory_entry_matches_identity(file_path.name, directory_fd, source_identity)
+        if directory_fd is not None
+        else _path_matches_identity(file_path, source_identity)
+    )
+    if not descriptor_matches or not source_matches:
+        _cleanup_copy_target(target, target_identity, directory_fd=directory_fd)
+        raise OSError(errno.EBUSY, f"Source changed before removal: {file_path}")
     try:
-        file_path.unlink()
+        if directory_fd is None:
+            file_path.unlink()
+        else:
+            os.unlink(file_path.name, dir_fd=directory_fd)
     except OSError as unlink_err:
-        _cleanup_reserved_target(target, target_identity)
+        _cleanup_copy_target(target, target_identity, directory_fd=directory_fd)
         raise OSError(
             f"Cross-filesystem rename: copied to {target}, could not remove source {file_path}: {unlink_err}"
         ) from unlink_err
+
+
+def _cleanup_copy_target(target: Path, identity: os.stat_result, *, directory_fd: int | None) -> None:
+    """Remove only the reserved target entry from its pinned directory."""
+    if directory_fd is None:
+        _cleanup_reserved_target(target, identity)
+    else:
+        _cleanup_reserved_directory_entry(target.name, directory_fd, identity)

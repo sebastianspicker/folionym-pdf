@@ -170,7 +170,7 @@ async def _event_stream(registry: RunRegistry, run_id: str, last_sequence: int) 
         await asyncio.sleep(0.25)
 
 
-def _external_endpoint_requirement(request: PreviewRequest) -> str | None:
+def _external_endpoint_requirement(request: PreviewRequest, acknowledged: set[str]) -> str | None:
     """Return the normalized external model URL when acknowledgement is required.
 
     The decision uses the configuration the Preview will run with, so endpoints
@@ -182,26 +182,27 @@ def _external_endpoint_requirement(request: PreviewRequest) -> str | None:
         endpoint = external_llm_endpoint(config)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    if endpoint is None or settings.acknowledged_external_endpoint == endpoint:
+    if endpoint is None or endpoint in acknowledged:
         return None
     return endpoint
 
 
-def _prepare_preview_settings(request: PreviewRequest) -> dict[str, object]:
+def _prepare_preview_settings(request: PreviewRequest, acknowledged: set[str]) -> dict[str, object]:
     """Validate external-boundary consent and normalize the selected source into settings."""
-    endpoint = _external_endpoint_requirement(request)
-    if endpoint is not None and not request.acknowledge_external_endpoint:
-        raise HTTPException(
-            409,
-            {
-                "code": "external_endpoint_ack_required",
-                "message": "Document-derived content may leave this machine.",
-                "endpoint": endpoint,
-            },
-        )
-    settings = request.settings.model_dump()
+    endpoint = _external_endpoint_requirement(request, acknowledged)
     if endpoint is not None:
-        settings["acknowledged_external_endpoint"] = endpoint
+        if request.acknowledge_external_endpoint != endpoint:
+            raise HTTPException(
+                409,
+                {
+                    "code": "external_endpoint_ack_required",
+                    "message": "Document-derived content may leave this machine.",
+                    "endpoint": endpoint,
+                },
+            )
+        acknowledged.add(endpoint)
+    settings = request.settings.model_dump()
+    settings["acknowledged_external_endpoint"] = ""
     source = str(Path(request.path).expanduser())
     if request.source_kind == "file":
         settings["single_file"] = source
@@ -255,6 +256,7 @@ def _install_security_middleware(app: FastAPI, session_token: str) -> None:
 
 def _register_source_routes(app: FastAPI, registry: RunRegistry) -> None:
     """Register bootstrap, filesystem navigation, and Preview creation."""
+    request_acknowledgements: set[str] = app.state.external_endpoint_acknowledgements
 
     @app.get("/api/v1/session")
     def session(request: Request) -> Response:
@@ -288,7 +290,7 @@ def _register_source_routes(app: FastAPI, registry: RunRegistry) -> None:
     @app.post("/api/v1/previews", response_model=RunStartedResponse, status_code=202)
     def start_preview(payload: PreviewRequest) -> RunStartedResponse:
         """Validate and enqueue one structured Preview run."""
-        settings = _prepare_preview_settings(payload)
+        settings = _prepare_preview_settings(payload, request_acknowledgements)
         try:
             run_id = registry.start_preview(Path(payload.path).expanduser(), settings)
         except RunConflictError as exc:
@@ -448,6 +450,7 @@ def create_app(
     app.state.registry = active_registry
     app.state.session_token = active_token
     app.state.static_dir = active_static_dir
+    app.state.external_endpoint_acknowledgements = set()
     _install_security_middleware(app, active_token)
     _register_source_routes(app, active_registry)
     _register_run_routes(app, active_registry)

@@ -88,6 +88,18 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Fixed
 
+- Kept browser consent for external model endpoints process-local, bound retries
+  to the exact resolved endpoint, and stopped restoring consent from shared UI
+  settings.
+- Bound recursive discovery, native PDF reads, reviewed Apply, backups, and copy
+  fallbacks to verified file identities so concurrent path substitution cannot
+  redirect processing or apply an approved rename to different bytes.
+- Retained the private PDF-metadata temporary descriptor through serialization,
+  mode changes, validation, and publication instead of trusting a mutable temp
+  pathname.
+- Escaped terminal controls in CLI and plain-log output and rendered reviewed
+  TUI filenames as literal Rich text, preventing crafted names from concealing
+  or restyling authorization displays.
 - The browser folder picker counted symbolic-link PDFs that Preview skips; counts
   now use the same discovery policy as a depth-one Preview.
 - Recover browser progress after transient failures with retries and a manual

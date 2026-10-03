@@ -9,6 +9,7 @@ from pathlib import Path
 from ..infrastructure.files import is_path_within
 
 MAX_RENAME_RETRIES = 20
+type ExpectedSourceIdentity = tuple[int, int, int, int]
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,7 @@ class RenameApplyOptions:
     on_success: Callable[[Path, Path, str], None] | None = None
     max_filename_chars: int | None = None
     exact_target: bool = False
+    expected_source_identity: ExpectedSourceIdentity | None = None
 
 
 @dataclass(frozen=True)

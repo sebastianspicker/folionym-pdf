@@ -87,14 +87,14 @@ export function SourcePage({
 
   const { run, error: runError, setError: setRunError, retry: retryRun } = useRun(runId, onRunComplete);
 
-  const startPreview = async (acknowledge = false) => {
+  const startPreview = async (acknowledgedEndpoint = "") => {
     setStartError("");
     if (!path.trim()) {
       setStartError(`Choose a ${kind === "file" ? "PDF" : "folder"} before continuing.`);
       return;
     }
     try {
-      const result = await api.startPreview(kind, path.trim(), settings, acknowledge);
+      const result = await api.startPreview(kind, path.trim(), settings, acknowledgedEndpoint);
       setAck(null);
       setRunId(result.run_id);
       onBootstrapChange({ ...bootstrap, settings });
@@ -143,7 +143,7 @@ export function SourcePage({
                   setAck(null);
                 }}>Cancel</Button>
                 <Button onClick={() => {
-                  void startPreview(true);
+                  void startPreview(ack?.endpoint ?? "");
                 }} variant="primary">
                   Send and build preview
                 </Button>

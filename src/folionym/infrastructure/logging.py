@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import TextIO
 
+from .display import escape_terminal_text
 from .private_io import open_private_append_text
 
 _MANAGED_HANDLER_ATTR = "_folionym_managed"
@@ -48,6 +49,14 @@ class StructuredLogFormatter(logging.Formatter):
                 },
                 ensure_ascii=False,
             )
+
+
+class PlainLogFormatter(logging.Formatter):
+    """Format plain logs without allowing record data to control a terminal."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Escape the fully rendered record, including exception and stack text."""
+        return escape_terminal_text(super().format(record))
 
 
 def default_log_path() -> str:
@@ -101,7 +110,7 @@ def _log_formatter() -> logging.Formatter:
     )
     if use_structured:
         return StructuredLogFormatter()
-    return logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    return PlainLogFormatter("%(asctime)s - %(levelname)s - %(message)s")
 
 
 def _setup_console_logging(root: logging.Logger, formatter: logging.Formatter, level: int) -> None:

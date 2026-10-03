@@ -216,10 +216,46 @@ def test_preview_requires_acknowledgement_for_the_endpoint_the_run_will_contact(
     assert body["detail"]["endpoint"] == _REMOTE_URL
     assert started == []
 
-    acknowledged = {**request, "acknowledge_external_endpoint": True}
+    acknowledged = {**request, "acknowledge_external_endpoint": _REMOTE_URL}
     status, _, _ = asgi_request(app, "POST", "/api/v1/previews", headers=headers, payload=acknowledged)
     assert status == 202
-    assert started[-1]["acknowledged_external_endpoint"] == _REMOTE_URL
+    assert started[-1]["acknowledged_external_endpoint"] == ""
+
+    status, _, _ = asgi_request(app, "POST", "/api/v1/previews", headers=headers, payload=request)
+    assert status == 202
+
+
+def test_external_endpoint_acknowledgement_is_exact_and_process_local(
+    tmp_path: Path, asgi_request: AsgiRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FOLIONYM_LLM_URL", _REMOTE_URL)
+    headers = {"cookie": "folionym_session=test-session"}
+    request = {
+        "source_kind": "directory",
+        "path": str(tmp_path),
+        "settings": {"acknowledged_external_endpoint": _REMOTE_URL},
+    }
+    app, registry, _ = _app_with_plan(tmp_path)
+    monkeypatch.setattr(registry, "start_preview", lambda _source, _settings: "run-1")
+
+    status, _, _ = asgi_request(app, "POST", "/api/v1/previews", headers=headers, payload=request)
+    assert status == 409
+
+    wrong = {**request, "acknowledge_external_endpoint": "https://other.example/v1/completions"}
+    status, _, body = asgi_request(app, "POST", "/api/v1/previews", headers=headers, payload=wrong)
+    assert status == 409
+    assert body["detail"]["endpoint"] == _REMOTE_URL
+
+    exact = {**request, "acknowledge_external_endpoint": _REMOTE_URL}
+    status, _, _ = asgi_request(app, "POST", "/api/v1/previews", headers=headers, payload=exact)
+    assert status == 202
+
+    fresh_root = tmp_path / "fresh"
+    fresh_root.mkdir()
+    fresh_app, fresh_registry, _ = _app_with_plan(fresh_root)
+    monkeypatch.setattr(fresh_registry, "start_preview", lambda _source, _settings: "run-2")
+    status, _, _ = asgi_request(fresh_app, "POST", "/api/v1/previews", headers=headers, payload=request)
+    assert status == 409
 
 
 def test_preview_with_a_loopback_endpoint_needs_no_acknowledgement(

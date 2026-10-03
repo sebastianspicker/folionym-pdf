@@ -40,6 +40,26 @@ def test_reviewed_plan_rejects_a_source_that_changed_after_preview(tmp_path: Pat
     assert not (tmp_path / "approved.pdf").exists()
 
 
+def test_reviewed_plan_binds_source_identity_at_the_mutation_boundary(tmp_path: Path, monkeypatch) -> None:
+    plan = _preview_plan_with_proposals(tmp_path, monkeypatch, ["approved"])
+    source = plan.items[0].source
+    original_reject = reviewed_plan.reject_source_symlink
+
+    def replace_after_preflight(path: Path) -> None:
+        original_reject(path)
+        path.unlink()
+        path.write_bytes(b"replacement after review")
+
+    monkeypatch.setattr(reviewed_plan, "reject_source_symlink", replace_after_preflight)
+
+    report = apply_reviewed_plan(plan, [plan.items[0].id])
+
+    assert report.items[0].status is ApplyStatus.FAILED
+    assert "Source changed after Preview" in (report.items[0].reason or "")
+    assert source.read_bytes() == b"replacement after review"
+    assert not (tmp_path / "approved.pdf").exists()
+
+
 def test_reviewed_plan_rejects_each_selected_exact_target_collision(tmp_path: Path, monkeypatch) -> None:
     plan = _preview_plan_with_proposals(tmp_path, monkeypatch, ["approved", "approved"])
 
