@@ -1,0 +1,339 @@
+/* Chrome: the running head, the stage strip, the consequence bar, page states. */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.demo-band {
+  padding: 7px var(--gutter);
+  border-bottom: 1px solid var(--ochre);
+  background: var(--ochre-wash);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.demo-band strong {
+  color: var(--ochre);
+}
+
+.demo-band a {
+  margin-left: var(--s-2);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s-6);
+  min-height: var(--masthead-h);
+  padding: 0 var(--gutter);
+  border-bottom: var(--hairline-strong);
+  background: var(--sheet);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: start;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.brand-mark {
+  color: var(--verdigris);
+}
+
+.brand-word {
+  font-family: var(--serif);
+  font-size: 1.3125rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1;
+}
+
+/* Stage strip: numbered like the sections of a register, not a pill wizard. */
+.stepper ol {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.stage + .stage::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  margin-right: var(--s-1);
+  background: var(--rule-strong);
+}
+
+.stage--done + .stage::before,
+.stage--done + .stage--current::before {
+  background: var(--verdigris);
+}
+
+.stage-hit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.stage-node {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-family: var(--serif);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: lining-nums;
+}
+
+.stage--done .stage-hit {
+  color: var(--verdigris-ink);
+}
+
+.stage--done .stage-node {
+  border-color: var(--verdigris);
+  background: var(--verdigris);
+  color: var(--on-verdigris);
+}
+
+.stage--current .stage-hit {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.stage--current .stage-node {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--sheet);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  justify-self: end;
+}
+
+.privacy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-3);
+  min-height: 30px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.privacy-mark {
+  width: 8px;
+  height: 8px;
+  background: var(--verdigris);
+}
+
+.privacy-chip--external {
+  border-color: var(--ochre);
+  background: var(--ochre-wash);
+  color: var(--ink);
+}
+
+.privacy-chip--external .privacy-mark {
+  background: var(--ochre);
+  transform: rotate(45deg) scale(0.86);
+}
+
+/* Body regions */
+.body-grid {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Consequence bar: what Apply will do, stated before it is possible. */
+.consequence {
+  position: sticky;
+  bottom: 0;
+  z-index: 15;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s-6);
+  padding: var(--s-3) var(--gutter);
+  border-top: var(--hairline-strong);
+  background: var(--sheet);
+}
+
+.consequence-copy {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+.consequence-count {
+  font-family: var(--serif);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.consequence-copy strong {
+  font-weight: 600;
+}
+
+.consequence-copy p {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.consequence-keys {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.consequence-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+/* Page states: loading and fatal. */
+.page-state,
+.fatal-state {
+  display: grid;
+  place-content: center;
+  justify-items: start;
+  gap: var(--s-3);
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: var(--s-8) var(--gutter);
+}
+
+.page-state {
+  justify-items: stretch;
+  width: min(20rem, 100%);
+}
+
+.page-state p {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.fatal-state svg {
+  color: var(--madder);
+}
+
+.fatal-state h1 {
+  font-size: var(--text-xl);
+}
+
+.fatal-state p {
+  color: var(--ink-2);
+  margin-bottom: var(--s-2);
+}
+
+@media (max-width: 960px) {
+  .consequence-keys {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .masthead {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--s-2) var(--s-4);
+    padding-top: var(--s-2);
+  }
+
+  .stepper {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0 calc(var(--gutter) * -1);
+    padding: 0 var(--gutter) var(--s-1);
+    border-top: var(--hairline);
+  }
+
+  .stepper ol {
+    justify-content: space-between;
+  }
+
+  .stage {
+    flex: 1;
+  }
+
+  .stage:first-child {
+    flex: none;
+  }
+
+  .stage + .stage::before {
+    flex: 1;
+    width: auto;
+  }
+
+  .header-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .consequence {
+    grid-template-columns: 1fr;
+    gap: var(--s-3);
+    padding-bottom: calc(var(--s-3) + env(safe-area-inset-bottom));
+  }
+
+  .consequence-copy p {
+    display: none;
+  }
+
+  .consequence-actions {
+    display: grid;
+    grid-template-columns: auto 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .privacy-chip {
+    padding: 0 var(--s-2);
+  }
+
+  .stage-label {
+    font-size: var(--text-xs);
+  }
+}

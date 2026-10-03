@@ -1,27 +1,41 @@
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "../api";
 import { AppChrome, Button, PageLoader } from "../components";
-import { ArrowRightIcon, InfoIcon, WarningIcon } from "../icons";
+import { ArrowRightIcon, WarningIcon } from "../icons";
 import { isLocalEndpoint } from "../lib/privacy";
 import { navigate } from "../lib/routing";
 import type { Bootstrap, Report } from "../types";
 import { ApplyReportLedger } from "./apply/ApplyReportLedger";
 
-function ResultMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone?: "success" | "danger";
-}) {
-  return (
-    <div className={`result-metric ${tone ? `result-metric--${tone}` : ""}`}>
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </div>
-  );
+const TALLY: Array<{ key: keyof Report["counts"]; label: string }> = [
+  { key: "renamed", label: "Renamed" },
+  { key: "failed", label: "Failed" },
+  { key: "unchanged", label: "Unchanged" },
+  { key: "skipped", label: "Skipped" },
+  { key: "cancelled", label: "Cancelled" },
+];
+
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+function headline(counts: Report["counts"]): { title: string; detail: string } {
+  const problems = counts.failed + counts.cancelled;
+  if (problems > 0) {
+    const parts = [`${counts.renamed} renamed`, counts.failed ? `${counts.failed} failed` : "", counts.cancelled ? `${counts.cancelled} cancelled` : ""];
+    return {
+      title: parts.filter(Boolean).join(", "),
+      detail:
+        "Files that failed a check, or were not reached, were left exactly as they were. Each one says why below.",
+    };
+  }
+  if (counts.renamed === 0) {
+    return { title: "Nothing was renamed", detail: "No file on disk changed. Each line below says why." };
+  }
+  return {
+    title: `${plural(counts.renamed, "file")} renamed`,
+    detail: "Each file passed its fingerprint and collision checks, then received the exact name you reviewed.",
+  };
 }
 
 export function ApplyPage({ bootstrap }: { bootstrap: Bootstrap }) {
@@ -49,7 +63,7 @@ export function ApplyPage({ bootstrap }: { bootstrap: Bootstrap }) {
     return (
       <div className="fatal-state">
         <WarningIcon />
-        <h1>Report unavailable</h1>
+        <h1>This report is gone</h1>
         <p>{error}</p>
         <Button onClick={() => {
           navigate("source");
@@ -58,9 +72,8 @@ export function ApplyPage({ bootstrap }: { bootstrap: Bootstrap }) {
     );
   }
 
-  const changed = report.counts.renamed;
-  const hasFailures = report.counts.failed + report.counts.cancelled > 0;
   const localOnly = isLocalEndpoint(bootstrap.settings);
+  const summary = headline(report.counts);
 
   return (
     <AppChrome
@@ -71,46 +84,31 @@ export function ApplyPage({ bootstrap }: { bootstrap: Bootstrap }) {
     >
       <main className="result-shell">
         <header className="result-heading">
-          <div className={`result-mark ${hasFailures ? "result-mark--partial" : ""}`}>
-            {hasFailures ? <WarningIcon size={26} /> : <span>✓</span>}
-          </div>
           <div>
-            <span className="eyebrow">Apply</span>
-            <h1>
-              {hasFailures
-                ? "Run finished with issues"
-                : `${changed} file${changed === 1 ? "" : "s"} renamed`}
-            </h1>
-            <p>
-              {hasFailures
-                ? "Validated renames were written. Items that failed checks were left unchanged."
-                : "Each selected file passed fingerprint and collision checks, then received its exact reviewed name."}
-            </p>
+            <h1>{summary.title}</h1>
+            <p>{summary.detail}</p>
           </div>
           <Button onClick={() => {
             navigate("source");
-          }} variant="primary">
+          }} type="button" variant="primary">
             New source <ArrowRightIcon />
           </Button>
         </header>
-        <section aria-label="Apply totals" className="result-overview">
-          <ResultMetric label="Renamed" tone="success" value={report.counts.renamed} />
-          <ResultMetric label="Unchanged" value={report.counts.unchanged} />
-          <ResultMetric
-            label="Failed"
-            tone={report.counts.failed ? "danger" : undefined}
-            value={report.counts.failed}
-          />
-          <ResultMetric label="Cancelled" value={report.counts.cancelled} />
+        <section aria-label="Apply totals">
+        <dl className="tally">
+          {TALLY.map(({ key, label }) => (
+            <div className={`tally-cell tally-cell--${key} ${report.counts[key] ? "" : "is-zero"}`} key={key}>
+              <dt>{label}</dt>
+              <dd>{report.counts[key]}</dd>
+            </div>
+          ))}
+        </dl>
         </section>
         <ApplyReportLedger items={report.items} />
-        <div className="source-notice">
-          <InfoIcon />
-          <p>
-            This report covers the current local session only. Use the CLI for watch mode, diagnostics, or undo
-            from a rename log.
-          </p>
-        </div>
+        <p className="result-footnote">
+          This report lasts only while Folionym runs. For an undo trail, set a rename log under Fine-tune → Output,
+          then use <code>folionym-undo</code> from a terminal.
+        </p>
       </main>
     </AppChrome>
   );

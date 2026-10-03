@@ -69,7 +69,7 @@ export function FolderBrowser({
       }
       onClose={onClose}
       open={open}
-      title="Choose a PDF folder"
+      title="Choose a folder of PDFs"
       wide
     >
       <div className="path-entry">
@@ -95,15 +95,15 @@ export function FolderBrowser({
       {error && <ErrorBanner message={error} onDismiss={() => {
         setError("");
       }} />}
-      {loading && <p role="status">Loading folder…</p>}
+      {loading && <p className="folder-loading" role="status">Reading folder…</p>}
       <div className="folder-list" aria-busy={loading}>
         {parentPath ? (
-          <button className="folder-row" onClick={() => {
+          <button className="folder-row folder-row--parent" onClick={() => {
             void browse(parentPath);
           }}>
             <FolderIcon />
             <span>
-              <strong>Parent folder</strong>
+              <strong>Up one level</strong>
               <small>{compactPath(parentPath)}</small>
             </span>
             <ChevronIcon />

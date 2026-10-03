@@ -1,4 +1,5 @@
 export { AppChrome } from "./AppChrome";
+export { Breakable } from "./Breakable";
 export { Button } from "./Button";
 export { Checkbox } from "./Checkbox";
 export { ErrorBanner } from "./ErrorBanner";
@@ -7,6 +8,7 @@ export { FineTuneDrawer, SettingsSection } from "./FineTuneDrawer";
 export { FolderBrowser } from "./FolderBrowser";
 export { compactPath, formatBytes } from "./format";
 export { Modal } from "./Modal";
+export { NameAnatomy } from "./NameAnatomy";
 export { PageLoader } from "./PageLoader";
 export { PrivacyChip } from "./PrivacyChip";
 export { RunOverlay } from "./RunOverlay";

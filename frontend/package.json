@@ -15,8 +15,9 @@
     "test:browser": "tsc --noEmit -p tsconfig.test.json --pretty false && node tests/browser-smoke.mjs"
   },
   "dependencies": {
-    "@fontsource/ibm-plex-mono": "^5.3.0",
-    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/atkinson-hyperlegible-mono": "^5.3.0",
+    "@fontsource/atkinson-hyperlegible-next": "^5.3.0",
+    "@fontsource/newsreader": "^5.3.0",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },

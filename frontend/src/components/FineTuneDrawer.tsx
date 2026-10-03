@@ -1,5 +1,6 @@
 import type { ChangeEvent, ReactNode } from "react";
 import type { Settings, SettingsBooleanKey, SettingsTextKey } from "../types";
+import { CloseIcon } from "../icons";
 import { Button } from "./Button";
 import { Field } from "./Field";
 import { Switch } from "./Switch";
@@ -143,12 +144,9 @@ export function FineTuneDrawer({
       <button aria-label="Close fine-tune settings" className="drawer-scrim" onClick={onClose} />
       <aside aria-label="Fine-tune settings" className="drawer drawer--open">
         <header className="drawer__header">
-          <div>
-            <span className="eyebrow">Settings</span>
-            <h2>Fine-tune</h2>
-          </div>
-          <button aria-label="Close fine-tune settings" className="icon-button" onClick={onClose}>
-            ×
+          <h2>Fine-tune</h2>
+          <button aria-label="Close fine-tune settings" className="icon-button" onClick={onClose} type="button">
+            <CloseIcon />
           </button>
         </header>
         <div className="drawer__body">

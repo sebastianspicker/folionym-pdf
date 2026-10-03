@@ -1,297 +1,331 @@
-/* Source page — prepare documents, picker, run summary */
+/* Source: the accession slip, the naming rules, and what happens next. */
 
 .source-shell {
-  flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  width: min(1200px, 100%);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  grid-template-areas:
+    "heading aside"
+    "slip aside"
+    "rules aside";
+  grid-template-rows: auto auto 1fr;
+  column-gap: clamp(32px, 6vw, 88px);
+  width: 100%;
+  max-width: 1180px;
   margin: 0 auto;
+  padding: clamp(32px, 6vh, 64px) var(--gutter) var(--s-16);
 }
 
-.source-main {
-  padding: 58px 64px 72px 40px;
+.source-heading {
+  grid-area: heading;
+  padding-bottom: var(--s-8);
 }
 
-.source-aside {
-  padding: 72px 36px;
-  background: var(--rail);
-  border-left: 1px solid var(--rule);
+.source-heading h1 {
+  max-width: 16ch;
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
 }
 
-.source-aside h2 {
-  font-size: 28px;
-  line-height: 1.14;
-  letter-spacing: -0.03em;
-}
-
-.source-aside > p {
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.aside-checks {
-  display: grid;
-  gap: 16px;
-  margin: 34px 0 40px;
+.source-heading p {
+  max-width: 54ch;
+  margin-top: var(--s-4);
   color: var(--ink-2);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 1rem;
+  line-height: 1.55;
 }
 
-.aside-checks > span {
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-}
-
-.aside-checks i {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+/* The slip: the one sheet on the page, because it holds the one decision. */
+.source-slip {
+  grid-area: slip;
   display: grid;
-  place-items: center;
-  border: 1px solid rgb(11 106 90 / 35%);
-  border-radius: 50%;
-  background: var(--verdigris-soft);
-}
-
-.aside-checks i span {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--verdigris);
-}
-
-.source-card {
-  padding: 24px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
-}
-
-.segmented {
-  width: max-content;
-  display: flex;
-  padding: 3px;
-  margin-bottom: 22px;
-  border-radius: 8px;
-  background: var(--rail);
-}
-
-.segmented button {
-  min-width: 110px;
-  padding: 8px 15px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 650;
-  transition: background 140ms var(--ease), color 140ms var(--ease);
-}
-
-.segmented button.is-active {
-  color: var(--ink);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
+  gap: var(--s-5);
+  padding: var(--s-5) var(--s-6) var(--s-6);
+  border: var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--sheet);
 }
 
 .source-picker {
-  min-height: 102px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 17px;
-  align-items: center;
-  padding: 20px;
-  border: 1px dashed var(--rule-strong);
-  border-radius: var(--radius);
-  background: #f7f9fb;
+  align-items: start;
+  gap: var(--s-4);
 }
 
 .source-picker__icon {
-  width: 50px;
-  height: 50px;
-  display: grid;
-  place-items: center;
-  border-radius: 9px;
-  color: var(--ink-2);
-  background: var(--surface);
-  border: 1px solid var(--rule);
+  margin-top: 2px;
+  color: var(--muted);
 }
 
 .source-picker__copy {
+  display: grid;
+  gap: var(--s-1);
   min-width: 0;
 }
 
-.source-picker__copy strong,
-.source-picker__copy span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.source-path {
+  font-size: 1.0625rem;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.source-path--empty {
+  font-family: var(--sans);
+  color: var(--muted);
+}
+
+.source-picker__copy > span:last-child {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+/* Naming rules */
+.rules {
+  grid-area: rules;
+  padding-top: var(--s-10);
+}
+
+.rules-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--ink);
+}
+
+.rules-head h2 {
+  font-size: var(--text-lg);
+}
+
+/* Name anatomy: the signature. A filename, taken apart and labelled. */
+.anatomy {
+  padding: var(--s-6) 0 var(--s-5);
+  border-bottom: var(--hairline);
+}
+
+.anatomy-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  row-gap: var(--s-3);
+  font-family: var(--mono);
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+  font-variant-ligatures: none;
+  line-height: 1.3;
+}
+
+.anatomy-part {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.anatomy-text {
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--rule-strong);
+  color: var(--ink);
   white-space: nowrap;
 }
 
-.source-picker__copy strong {
-  font-size: 14px;
-  font-weight: 650;
+.anatomy-part[data-field="date"] .anatomy-text {
+  color: var(--verdigris-ink);
+  border-bottom-color: var(--verdigris);
 }
 
-.source-picker__copy span {
-  margin-top: 6px;
+.anatomy-part--ext .anatomy-text {
+  border-bottom-color: transparent;
   color: var(--muted);
-  font-size: 12px;
-  font-family: var(--mono);
 }
 
-.source-file-field {
-  margin-top: 18px;
+.anatomy-sep {
+  color: var(--muted);
 }
 
-.run-summary {
-  margin-top: 42px;
+.anatomy-field {
+  padding-top: 5px;
+  font-family: var(--sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
-.run-summary__header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 10px;
+.anatomy:not([data-case="camelCase"]) .anatomy-part + .anatomy-part .anatomy-field {
+  padding-left: 1ch; /* clears the separator that opens each later segment */
 }
 
-.run-summary__header h2 {
-  margin: 0;
+.anatomy figcaption {
+  margin-top: var(--s-4);
+  font-family: var(--serif);
+  font-size: var(--text-md);
+  font-style: italic;
+  color: var(--muted);
 }
 
-.summary-list {
-  border-top: 1px solid var(--rule-strong);
+.anatomy--template .anatomy-name {
+  display: block;
 }
 
-.summary-row {
+.rule-list {
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
-  gap: 24px;
-  padding: 15px 0;
-  border-bottom: 1px solid var(--rule);
-  font-size: 13px;
 }
 
-.summary-row span {
+.rule-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr);
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: var(--hairline);
+}
+
+.rule-row dt {
   color: var(--muted);
 }
 
-.summary-row strong {
-  font-weight: 580;
+.rule-row dd {
+  color: var(--ink);
+  font-weight: 600;
 }
 
-.source-notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 26px;
+/* Aside: the promise, then the action. */
+.source-aside {
+  grid-area: aside;
+  align-self: start;
+  position: sticky;
+  top: calc(var(--masthead-h) + var(--s-8));
+  padding-top: var(--s-2);
+}
+
+.source-aside h2 {
+  font-size: var(--text-lg);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--ink);
+}
+
+.assurances {
+  counter-reset: assurance;
+  margin-bottom: var(--s-6);
+}
+
+.assurances li {
+  counter-increment: assurance;
+  position: relative;
+  padding: var(--s-3) 0 var(--s-3) 2.25rem;
+  border-bottom: var(--hairline);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
-.source-notice svg {
-  flex: 0 0 auto;
-  margin-top: 1px;
+.assurances li::before {
+  content: counter(assurance);
+  position: absolute;
+  top: 9px;
+  left: 0;
+  font-family: var(--serif);
+  font-size: var(--text-lg);
+  font-weight: 400;
+  line-height: 1.2;
+  font-variant-numeric: oldstyle-nums;
   color: var(--verdigris);
 }
 
-.source-notice p {
-  margin: 0;
+.assurances strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 
-.source-notice strong {
-  color: var(--ink-2);
+.source-start {
+  min-height: 44px;
+  font-size: 0.9375rem;
 }
 
-@media (max-width: 1050px) {
+/* Consent dialog body */
+.consent {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--s-4);
+}
+
+.consent > svg {
+  color: var(--ochre);
+}
+
+.consent div {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.consent-endpoint {
+  padding: var(--s-2) var(--s-3);
+  border-left: 2px solid var(--ochre);
+  background: var(--ochre-wash);
+  color: var(--ink);
+}
+
+@media (max-width: 960px) {
   .source-shell {
-    grid-template-columns: minmax(0, 1fr) 300px;
-  }
-
-  .source-main {
-    padding-inline: 32px;
-  }
-}
-
-@media (max-width: 900px) {
-  .source-shell {
-    display: block;
-    width: 100%;
-  }
-
-  .source-main {
-    padding: 42px 24px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "heading"
+      "slip"
+      "aside"
+      "rules";
+    grid-template-rows: none;
+    max-width: 680px;
   }
 
   .source-aside {
-    padding: 35px 24px 44px;
-    border-top: 1px solid var(--rule);
-    border-left: 0;
+    position: static;
+    padding-top: var(--s-8);
   }
 }
 
-@media (max-width: 520px) {
-  .source-main {
-    padding: 34px 16px;
+@media (max-width: 560px) {
+  .source-shell {
+    padding-top: var(--s-6);
   }
 
-  .page-heading {
-    display: block;
-    margin-bottom: 26px;
+  .source-heading {
+    padding-bottom: var(--s-6);
   }
 
-  .page-heading h1 {
-    font-size: 32px;
+  .source-heading h1 {
+    font-size: 2rem;
   }
 
-  .page-heading > .button,
-  .page-heading > .btn {
-    width: 100%;
-    margin-top: 16px;
+  .source-heading p {
+    font-size: var(--text-md);
   }
 
-  .source-card {
-    padding: 16px;
-  }
-
-  .segmented {
-    width: 100%;
-  }
-
-  .segmented button {
-    min-width: 0;
-    flex: 1;
+  .source-slip {
+    margin: 0 calc(var(--gutter) * -1);
+    padding: var(--s-4) var(--gutter) var(--s-5);
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
   }
 
   .source-picker {
-    grid-template-columns: auto minmax(0, 1fr);
-    padding: 15px;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .source-picker > .button,
-  .source-picker > .btn {
-    grid-column: 1 / -1;
-    width: 100%;
+  .source-picker__icon {
+    display: none;
   }
 
-  .source-picker__copy span {
-    white-space: normal;
-    line-height: 1.4;
+  .source-picker .button {
+    justify-self: start;
   }
 
-  .summary-row {
-    grid-template-columns: 1fr;
-    gap: 5px;
-  }
-
-  .source-aside {
-    padding-inline: 16px;
+  .rule-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
 }

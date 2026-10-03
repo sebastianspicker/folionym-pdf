@@ -1,6 +1,6 @@
 import { type RefObject } from "react";
-import { Button, Checkbox, ErrorBanner, StatusPill } from "../../components";
-import { Pagination } from "../../components/Pagination";
+import { Breakable, Button, Checkbox, ErrorBanner, StatusPill } from "../../components";
+import { PAGE_SIZE, Pagination } from "../../components/Pagination";
 import { SearchIcon } from "../../icons";
 import { changedFilenameSegments } from "../../lib/filenameDiff";
 import type { Plan, PreviewItem, PreviewStatus } from "../../types";
@@ -39,6 +39,28 @@ type LedgerProps = {
   searchRef?: RefObject<HTMLInputElement | null>;
 };
 
+type Segment = { text: string; className: string | undefined };
+
+/** Splits a proposed name into kept and new text, with a leading date set apart. */
+function proposedSegments(currentName: string, proposedName: string): Segment[] {
+  const dateLength = /^\d{8}(?!\d)/.test(proposedName) ? 8 : 0;
+  const segments: Segment[] = [];
+  let offset = 0;
+  for (const segment of changedFilenameSegments(currentName, proposedName)) {
+    const base = segment.changed ? undefined : "name__kept";
+    const end = offset + segment.text.length;
+    if (offset < dateLength) {
+      const split = Math.min(dateLength, end) - offset;
+      segments.push({ text: segment.text.slice(0, split), className: "name__date" });
+      if (split < segment.text.length) segments.push({ text: segment.text.slice(split), className: base });
+    } else {
+      segments.push({ text: segment.text, className: base });
+    }
+    offset = end;
+  }
+  return segments;
+}
+
 export function Ledger({
   page,
   totalItems,
@@ -58,29 +80,28 @@ export function Ledger({
   onDismissError,
   searchRef,
 }: LedgerProps) {
+  const numberWidth = Math.max(3, String(totalItems).length);
   return (
-    <section className="ledger-panel" id="ledger">
+    <main className="ledger-panel" id="ledger">
       <div className="ledger-head">
-        <div>
-          <p className="kicker">Preview · immutable plan once applied</p>
-          <h1>Rename ledger</h1>
-          <p className="lede">
-            Compare source to proposed name. Checked rows keep their exact
-            target on Apply.
-          </p>
+        <div className="ledger-title">
+          <h1>Proposed names</h1>
+          <p className="lede">Tick the names to write. Nothing on disk changes until you apply.</p>
         </div>
         <div className="ledger-tools">
           <label className="search">
             <span className="visually-hidden">Search filenames</span>
             <SearchIcon />
             <input
+              aria-keyshortcuts="/"
               aria-label="Search filenames"
               autoComplete="off"
               onChange={(event) => {
                 onQueryChange(event.target.value);
               }}
-              placeholder="Filter by name…"
+              placeholder="Find a filename"
               ref={searchRef}
+              spellCheck={false}
               type="search"
               value={query}
             />
@@ -108,10 +129,9 @@ export function Ledger({
       {error && <ErrorBanner message={error} onDismiss={onDismissError} />}
 
       <div className="ledger-chrome" aria-hidden="true">
+        <span className="col-no">No.</span>
         <span className="col-check" />
-        <span className="col-from">Current</span>
-        <span className="col-arrow" />
-        <span className="col-to">Proposed</span>
+        <span className="col-names">Current name, then proposed name</span>
         <span className="col-status">Status</span>
       </div>
 
@@ -134,7 +154,7 @@ export function Ledger({
           return (
             <article
               aria-selected={isSelected}
-              aria-posinset={page * 50 + index + 1}
+              aria-posinset={page * PAGE_SIZE + index + 1}
               aria-setsize={totalItems}
               className={`row ${isSelected ? "is-selected" : ""} ${isActive ? "is-active" : ""}`}
               data-id={item.id}
@@ -163,6 +183,9 @@ export function Ledger({
               role="option"
               tabIndex={isActive ? 0 : -1}
             >
+              <span aria-hidden="true" className="row-no">
+                {String(page * PAGE_SIZE + index + 1).padStart(numberWidth, "0")}
+              </span>
               <label
                 className="row-check"
                 onClick={(event) => {
@@ -180,53 +203,43 @@ export function Ledger({
                 <span className="visually-hidden">Include</span>
               </label>
               <div className="name-pair">
-                <code className="name name--from" title={item.current_name}>
-                  {item.current_name}
+                <code className="name name--from filename" title={item.current_name}>
+                  <Breakable text={item.current_name} />
                 </code>
-                <span aria-hidden="true" className="arrow">
-                  →
-                </span>
-                <code
-                  className={`name name--to ${mutedTarget ? "name--muted" : ""}`}
-                  title={item.proposed_name ?? ""}
-                >
-                  {item.proposed_name
-                    ? changedFilenameSegments(
-                        item.current_name,
-                        item.proposed_name,
-                      ).map((segment, index) => (
-                        <span
-                          className={
-                            segment.changed ? "name__changed" : undefined
-                          }
-                          key={`${segment.text}-${index}`}
-                        >
-                          {segment.text}
-                        </span>
-                      ))
-                    : item.status === "skipped"
-                      ? "Unchanged · already named"
+                {item.proposed_name && !mutedTarget ? (
+                  <code className="name name--to filename" title={item.proposed_name}>
+                    <span className="visually-hidden">becomes </span>
+                    {proposedSegments(item.current_name, item.proposed_name).map((segment, segmentIndex) => (
+                      <span className={segment.className} key={`${segment.text}-${segmentIndex}`}>
+                        <Breakable text={segment.text} />
+                      </span>
+                    ))}
+                  </code>
+                ) : (
+                  <span className="name name--none">
+                    {item.status === "skipped"
+                      ? "Keeps its current name"
                       : item.status === "failed"
-                        ? "No proposal · extract failed"
+                        ? "No name proposed"
                         : "No proposal"}
-                </code>
+                  </span>
+                )}
+                {item.reason && (item.status === "review" || item.status === "failed") ? (
+                  <span className="row-note">{item.reason}</span>
+                ) : null}
               </div>
-              <StatusPill
-                label={filterLabel(item.status)}
-                status={item.status}
-              />
+              <StatusPill label={filterLabel(item.status)} status={item.status} />
             </article>
           );
         })}
         {visibleItems.length === 0 && (
           <div className="table-empty">
-            <SearchIcon />
-            <strong>No matching documents</strong>
-            <span>Clear the search or choose another status.</span>
+            <strong>Nothing matches{query ? ` “${query}”` : ""}.</strong>
+            <span>Clear the search or show another status.</span>
           </div>
         )}
       </div>
       <Pagination page={page} total={totalItems} onChange={onPageChange} />
-    </section>
+    </main>
   );
 }

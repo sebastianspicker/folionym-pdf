@@ -2,35 +2,36 @@ import { useCallback, useState } from "react";
 import { ApiError, api, errorMessage } from "../api";
 import {
   AppChrome,
+  Breakable,
   Button,
   ErrorBanner,
   Field,
   FineTuneDrawer,
   FolderBrowser,
   Modal,
+  NameAnatomy,
   RunOverlay,
   TextInput,
 } from "../components";
 import { useRun } from "../hooks/useRun";
-import {
-  ArrowRightIcon,
-  DocumentIcon,
-  FolderIcon,
-  InfoIcon,
-  SlidersIcon,
-  WarningIcon,
-} from "../icons";
+import { ArrowRightIcon, FolderIcon, SlidersIcon, WarningIcon } from "../icons";
 import { isLocalEndpoint } from "../lib/privacy";
 import { navigate } from "../lib/routing";
 import type { Bootstrap, Run, Settings } from "../types";
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="summary-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className="rule-row">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
+}
+
+function caseLabel(value: Settings["case"]): string {
+  if (value === "snakeCase") return "snake_case";
+  if (value === "camelCase") return "camelCase";
+  return "kebab-case";
 }
 
 type ExternalEndpointAcknowledgementDetail = {
@@ -144,7 +145,7 @@ export function SourcePage({
                 <Button onClick={() => {
                   void startPreview(true);
                 }} variant="primary">
-                  Continue once
+                  Send and build preview
                 </Button>
               </>
             }
@@ -152,14 +153,15 @@ export function SourcePage({
               setAck(null);
             }}
             open={Boolean(ack)}
-            title="Confirm external endpoint"
+            title="Send document text off this computer?"
           >
             <div className="consent">
               <WarningIcon />
-              <p>
-                Document-derived text may leave this machine for <strong>{ack?.endpoint}</strong>. Acknowledgement
-                applies only to this exact endpoint for this session.
-              </p>
+              <div>
+                <p>Preview will send text extracted from these PDFs to a model outside this computer:</p>
+                <code className="consent-endpoint filename"><Breakable text={ack?.endpoint ?? ""} /></code>
+                <p>This confirmation covers only this exact endpoint, for this session.</p>
+              </div>
             </div>
           </Modal>
           <RunOverlay
@@ -179,149 +181,128 @@ export function SourcePage({
       source={path}
     >
       <main className="source-shell">
-        <section className="source-main">
-          <div className="page-heading">
-            <div>
-              <span className="eyebrow">Source</span>
-              <h1>Choose local PDFs</h1>
-              <p>
-                Select a folder or one file. Preview proposes names; nothing is written until you apply exact
-                targets.
-              </p>
-            </div>
-            <Button onClick={() => {
-              setDrawerOpen(true);
-            }}>
-              <SlidersIcon /> Fine-tune
-            </Button>
+        <header className="source-heading">
+          <h1>Which PDFs need better names?</h1>
+          <p>
+            Pick a folder or a single file. Folionym reads each PDF on this computer and proposes a name; you
+            decide which names get written.
+          </p>
+        </header>
+
+        <section aria-labelledby="source-slip-title" className="source-slip">
+          <h2 className="visually-hidden" id="source-slip-title">Source</h2>
+          <div aria-label="Source type" className="segmented" role="group">
+            <button
+              aria-pressed={kind === "directory"}
+              className={kind === "directory" ? "is-active" : ""}
+              onClick={() => {
+                setKind("directory");
+                setPath(settings.directory);
+              }}
+              type="button"
+            >
+              Folder
+            </button>
+            <button
+              aria-pressed={kind === "file"}
+              className={kind === "file" ? "is-active" : ""}
+              onClick={() => {
+                setKind("file");
+                setPath(settings.single_file);
+              }}
+              type="button"
+            >
+              Single PDF
+            </button>
           </div>
           {startError && <ErrorBanner message={startError} onDismiss={() => {
             setStartError("");
           }} />}
-          <div className="source-card">
-            <div aria-label="Source type" className="segmented" role="group">
-              <button
-                aria-pressed={kind === "directory"}
-                className={kind === "directory" ? "is-active" : ""}
-                onClick={() => {
-                  setKind("directory");
-                  setPath(settings.directory);
-                }}
-              >
-                Folder
-              </button>
-              <button
-                aria-pressed={kind === "file"}
-                className={kind === "file" ? "is-active" : ""}
-                onClick={() => {
-                  setKind("file");
-                  setPath(settings.single_file);
-                }}
-              >
-                Single PDF
-              </button>
-            </div>
+          {kind === "directory" ? (
             <div className="source-picker">
-              <div className="source-picker__icon">
-                {kind === "directory" ? <FolderIcon size={28} /> : <DocumentIcon size={28} />}
-              </div>
+              <FolderIcon className="source-picker__icon" size={24} />
               <div className="source-picker__copy">
-                <strong>{path || (kind === "directory" ? "No folder selected" : "No PDF selected")}</strong>
+                {path ? (
+                  <code className="source-path filename"><Breakable text={path} /></code>
+                ) : (
+                  <span className="source-path source-path--empty">No folder chosen yet</span>
+                )}
                 <span>
-                  {kind === "directory"
-                    ? "PDFs only. Subfolders follow the recursive setting."
-                    : "Absolute path to one local PDF."}
+                  {settings.recursive
+                    ? "PDFs in this folder and its subfolders."
+                    : "PDFs directly in this folder. Subfolders are left out."}
                 </span>
               </div>
-              {kind === "directory" ? (
-                <Button onClick={() => {
-                  setFolderOpen(true);
-                }}>Browse</Button>
-              ) : (
-                <Button onClick={() => {
-                  setPath("");
-                }}>Clear</Button>
-              )}
+              <Button onClick={() => {
+                setFolderOpen(true);
+              }} type="button">
+                {path ? "Change folder" : "Choose folder"}
+              </Button>
             </div>
-            {kind === "file" && (
-              <Field className="source-file-field" label="Absolute PDF path">
-                <TextInput
-                  onChange={(event) => {
-                    setPath(event.target.value);
-                  }}
-                  placeholder="/Users/you/Documents/scan.pdf"
-                  value={path}
-                />
-              </Field>
-            )}
-          </div>
-          <section className="run-summary">
-            <div className="run-summary__header">
-              <div>
-                <span className="eyebrow">Configuration</span>
-                <h2>Effective settings</h2>
-              </div>
-              <button className="text-button" onClick={() => {
-                setDrawerOpen(true);
-              }}>
-                Edit
-              </button>
-            </div>
-            <div className="summary-list">
-              <SummaryRow label="Filename style" value={`${settings.case} · ${settings.date_format.toUpperCase()} date`} />
-              <SummaryRow
-                label="Extraction"
-                value={`${settings.use_ocr ? "OCR" : "Text"} · ${settings.recursive ? "include subfolders" : "this folder only"}`}
+          ) : (
+            <Field className="source-file-field" hint="The full path to one PDF on this computer." label="PDF path">
+              <TextInput
+                onChange={(event) => {
+                  setPath(event.target.value);
+                }}
+                placeholder="/Users/you/Documents/scan.pdf"
+                spellCheck={false}
+                value={path}
               />
-              <SummaryRow
-                label="Enrichment"
-                value={
-                  settings.use_llm
-                    ? `${settings.llm_model || "Configured model"} · ${localOnly ? "local endpoint" : "external endpoint"}`
-                    : "Rules and heuristics only"
-                }
-              />
-              <SummaryRow label="Apply" value="Reviewed exact names only" />
-            </div>
-          </section>
-          <div className="source-notice">
-            <InfoIcon />
-            <p>
-              <strong>Preview does not rename files.</strong> Apply re-checks each source fingerprint and target
-              before writing.
-            </p>
-          </div>
+            </Field>
+          )}
         </section>
-        <aside className="source-aside">
-          <span className="eyebrow">Next</span>
-          <h2>Build a preview</h2>
-          <p>Extract naming evidence and rank proposals. You review every name before any path changes.</p>
-          <div className="aside-checks">
-            <span>
-              <i>
-                <span />
-              </i>
-              Sources stay in place during Preview
-            </span>
-            <span>
-              <i>
-                <span />
-              </i>
-              Uncertain items are marked Review
-            </span>
-            <span>
-              <i>
-                <span />
-              </i>
-              Apply uses only checked exact targets
-            </span>
-          </div>
-          <Button className="button--full" onClick={() => {
+
+        <aside aria-labelledby="source-next-title" className="source-aside">
+          <h2 id="source-next-title">Before anything moves</h2>
+          <ol className="assurances">
+            <li>
+              <strong>Preview proposes, it never renames.</strong> Every PDF stays exactly where and as it is.
+            </li>
+            <li>
+              <strong>Doubt is shown, not hidden.</strong> Uncertain names are marked Review, with the evidence
+              beside them.
+            </li>
+            <li>
+              <strong>Apply writes only what you tick.</strong> Exact names, re-checked first; any conflict stops
+              that file.
+            </li>
+          </ol>
+          <Button className="button--full source-start" onClick={() => {
             void startPreview();
-          }} variant="primary">
+          }} type="button" variant="primary">
             Build preview <ArrowRightIcon />
           </Button>
         </aside>
+
+        <section aria-labelledby="rules-title" className="rules">
+          <header className="rules-head">
+            <h2 id="rules-title">Naming rules</h2>
+            <Button onClick={() => {
+              setDrawerOpen(true);
+            }} type="button">
+              <SlidersIcon /> Fine-tune
+            </Button>
+          </header>
+          <NameAnatomy settings={settings} />
+          <dl className="rule-list">
+            <SummaryRow label="Case" value={caseLabel(settings.case)} />
+            <SummaryRow label="Document language" value={settings.language === "de" ? "German" : "English"} />
+            <SummaryRow
+              label="Ambiguous dates"
+              value={settings.date_format === "dmy" ? "Read as day / month / year" : "Read as month / day / year"}
+            />
+            <SummaryRow label="Text" value={settings.use_ocr ? "Text layer, OCR for scans" : "Text layer only"} />
+            <SummaryRow
+              label="Model"
+              value={
+                settings.use_llm
+                  ? `${settings.llm_model || "Configured model"}, ${localOnly ? "loopback endpoint" : "external endpoint"}`
+                  : "None. Rules and heuristics only"
+              }
+            />
+          </dl>
+        </section>
       </main>
     </AppChrome>
   );

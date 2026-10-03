@@ -13,30 +13,17 @@ import { usePreviewApply } from "./preview/usePreviewApply";
 import { usePreviewPlan } from "./preview/usePreviewPlan";
 
 function caseLabel(value: string): string {
-  if (value === "kebabCase") return "kebab";
-  if (value === "snakeCase") return "snake";
-  if (value === "camelCase") return "camel";
+  if (value === "kebabCase") return "kebab-case";
+  if (value === "snakeCase") return "snake_case";
   return value;
-}
-
-function dateLabel(value: string): string {
-  if (value === "dmy") return "DDMMYYYY";
-  if (value === "mdy") return "MMDDYYYY";
-  return value.toUpperCase();
 }
 
 function processingFacts(settings: Settings) {
   return [
-    {
-      label: "Naming",
-      value: `${caseLabel(settings.case)} · ${dateLabel(settings.date_format)}`,
-    },
-    { label: "Extraction", value: settings.use_ocr ? "OCR" : "Text" },
-    {
-      label: "Enrichment",
-      value: settings.use_llm ? settings.llm_model || "Model" : "Rules only",
-    },
-    { label: "Plan", value: "Immutable" },
+    { label: "Case", value: caseLabel(settings.case) },
+    { label: "Dates", value: settings.date_format === "mdy" ? "Month first" : "Day first" },
+    { label: "Text", value: settings.use_ocr ? "OCR for scans" : "Text layer only" },
+    { label: "Model", value: settings.use_llm ? settings.llm_model || "Configured" : "None" },
   ];
 }
 
@@ -99,14 +86,17 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
     return (
       <div className="fatal-state">
         <WarningIcon size={28} />
-        <h1>Preview unavailable</h1>
-        <p>{preview.error || "This preview is no longer available."}</p>
+        <h1>This preview is gone</h1>
+        <p>
+          {preview.error ||
+            "Previews live only while Folionym runs, and expire after an hour. No files were changed."}
+        </p>
         <Button
           onClick={() => {
             navigate("source");
           }}
         >
-          Start again
+          Build a new preview
         </Button>
       </div>
     );

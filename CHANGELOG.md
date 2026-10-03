@@ -32,6 +32,15 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Changed
 
+- Redesigned the browser interface, static demo, and screenshot tour as a
+  numbered rename register (see `DESIGN_BRIEF.md`). Proposed names now stack
+  under current names and wrap instead of truncating; review and failure
+  reasons appear beside their rows; Source shows an example filename taken
+  apart into its fields; the Apply report lists the real status of every file
+  and colours only failures as errors. The interface uses Newsreader, Atkinson
+  Hyperlegible Next, and Atkinson Hyperlegible Mono instead of IBM Plex. The
+  date-order setting is now described as how ambiguous dates are read, not as
+  the output date format.
 - Rewrote the README and user documentation for a general GitHub audience while
   preserving documented behavior, limits, and contracts.
 - Generalized the ignore rules for common Node, editor, OS, and credential

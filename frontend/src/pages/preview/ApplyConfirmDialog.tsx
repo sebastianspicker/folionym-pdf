@@ -35,32 +35,32 @@ export function ApplyConfirmDialog({
       }
       onClose={onClose}
       open={open}
-      title={`Write ${selectedCount} selected ${nameLabel}?`}
+      title={`Write ${selectedCount} ${nameLabel}?`}
     >
       <div className="apply-confirmation">
         <p>
-          <strong>{selectedCount} files</strong> in{" "}
-          <code>{compactPath(source)}</code> will be renamed to their exact
-          reviewed targets. Changed sources and new collisions fail safely.
+          {selectedCount} {selectedCount === 1 ? "file" : "files"} in <code className="filename">{compactPath(source)}</code>{" "}
+          will get the exact {nameLabel} you reviewed. If a file changed since Preview, or its new name is now taken,
+          that file is left alone and reported.
         </p>
         <dl className="confirm-summary">
           <div>
-            <dt>Plan</dt>
-            <dd>Exact targets · no recompute</dd>
+            <dt>Names</dt>
+            <dd>Exactly as reviewed, not recomputed</dd>
           </div>
           <div>
-            <dt>Review</dt>
-            <dd>{reviewCount} marked for attention</dd>
-          </div>
-          <div>
-            <dt>Untouched</dt>
-            <dd>{skippedFailedCount} skipped or failed</dd>
-          </div>
-          <div>
-            <dt>Privacy</dt>
-            <dd>
-              {localOnly ? "Local only" : "External model used during Preview"}
+            <dt>Marked Review</dt>
+            <dd className={reviewCount ? "is-attention" : undefined}>
+              {reviewCount} in this preview; only ticked ones are written
             </dd>
+          </div>
+          <div>
+            <dt>Left alone</dt>
+            <dd>{skippedFailedCount} skipped or failed, plus anything unticked</dd>
+          </div>
+          <div>
+            <dt>Model setting</dt>
+            <dd>{localOnly ? "Loopback endpoint, or no model" : "External endpoint: document text may have left this computer"}</dd>
           </div>
         </dl>
       </div>

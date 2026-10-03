@@ -1,25 +1,22 @@
 # Third-party notices
 
-## IBM Plex Sans and IBM Plex Mono
+## Newsreader, Atkinson Hyperlegible Next, and Atkinson Hyperlegible Mono
 
-The web interface imports the Latin subsets of IBM Plex Sans and IBM Plex Mono
-from `@fontsource/ibm-plex-sans` and `@fontsource/ibm-plex-mono`, version
-`5.3.0`. The shipped package metadata and license files identify both fonts as
-licensed under the SIL Open Font License, Version 1.1.
+The web interface imports the Latin subsets of Newsreader, Atkinson Hyperlegible
+Next, and Atkinson Hyperlegible Mono from `@fontsource/newsreader`,
+`@fontsource/atkinson-hyperlegible-next`, and
+`@fontsource/atkinson-hyperlegible-mono`, version `5.3.0`. The shipped package
+metadata and license files identify all three fonts as licensed under the SIL
+Open Font License, Version 1.1.
 
-Copyright 2019 IBM Corp. All rights reserved.
+Copyright 2020 The Newsreader Project Authors
+(http://github.com/productiontype/Newsreader).
 
-IBMPlexSans-Italic[wdth,wght].ttf: Copyright 2019 IBM Corp. All rights
-reserved.
+Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors
+(https://github.com/googlefonts/atkinson-hyperlegible-next).
 
-Copyright 2017 IBM Corp. All rights reserved.
-
-IBMPlexMono-ThinItalic.ttf, IBMPlexMono-ExtraLight.ttf,
-IBMPlexMono-ExtraLightItalic.ttf, IBMPlexMono-Light.ttf,
-IBMPlexMono-LightItalic.ttf, IBMPlexMono-Regular.ttf, IBMPlexMono-Italic.ttf,
-IBMPlexMono-Medium.ttf, IBMPlexMono-MediumItalic.ttf, IBMPlexMono-SemiBold.ttf,
-IBMPlexMono-SemiBoldItalic.ttf, IBMPlexMono-Bold.ttf, and
-IBMPlexMono-BoldItalic.ttf: Copyright 2017 IBM Corp. All rights reserved.
+Copyright 2020-2024 The Atkinson Hyperlegible Mono Project Authors
+(https://github.com/googlefonts/atkinson-hyperlegible-next-mono).
 
 The license text supplied with those packages follows.
 

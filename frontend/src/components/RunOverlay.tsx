@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { terminalStates } from "../hooks/useRun";
 import type { Run } from "../types";
 import { Button } from "./Button";
@@ -23,36 +24,43 @@ export function RunOverlay({
     <Modal
       description={
         run?.kind === "apply"
-          ? "Writing only the exact names you approved."
-          : "Reading local PDFs and building filename proposals."
+          ? "Writing only the exact names you ticked."
+          : "Reading each PDF on this computer and proposing a name. Nothing is renamed."
       }
       onClose={isTerminal || error ? onClose : () => undefined}
       open={Boolean(run) || Boolean(error)}
-      title={run?.kind === "apply" ? "Applying names" : "Building preview"}
+      title={run?.kind === "apply" ? "Writing names" : "Building preview"}
     >
       {error ? (
         <><ErrorBanner message={error} /><Button onClick={onRetry}>Retry connection</Button></>
       ) : (
         <div className="run-status">
           <div className="run-status__row">
-            <strong>{run?.message}</strong>
-            <span>{run?.total ? `${run.completed} / ${run.total}` : "Starting…"}</span>
+            <strong>{run?.message || "Starting…"}</strong>
+            <span className="run-count">
+              {run?.total ? (
+                <>
+                  {run.completed}
+                  <small> / {run.total}</small>
+                </>
+              ) : null}
+            </span>
           </div>
           <div
             aria-label={`${percentage}% complete`}
             aria-valuemax={100}
             aria-valuemin={0}
             aria-valuenow={percentage}
-            className="progress"
+            className={run?.total ? "progress" : "progress progress--indeterminate"}
             role="progressbar"
           >
-            <span style={{ width: `${percentage}%` }} />
+            <span style={{ "--progress": percentage / 100 } as CSSProperties} />
           </div>
-          <p>{run?.current_file ?? "Preparing…"}</p>
+          <p className="run-file filename">{run?.current_file || "Preparing…"}</p>
           {run?.error && <ErrorBanner message={run.error} />}
           {!isTerminal && (
             <Button onClick={onCancel} variant="secondary">
-              Cancel after current file
+              Stop after this file
             </Button>
           )}
         </div>

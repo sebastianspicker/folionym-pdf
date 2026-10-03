@@ -1,5 +1,6 @@
 import { type MouseEvent, type ReactNode, useEffect, useState } from "react";
 import { isDemo } from "../api";
+import { BrandMark, MoonIcon, SunIcon } from "../icons";
 import { navigate } from "../lib/routing";
 import { compactPath } from "./format";
 import { PrivacyChip } from "./PrivacyChip";
@@ -45,68 +46,49 @@ function AppHeader({
   theme: Theme;
   onThemeChange: () => void;
 }) {
+  const nextTheme = theme === "light" ? "dark" : "light";
   return (
-    <header className="instrument-bar">
-      <div className="brand-block">
+    <>
+      {isDemo ? (
+        <p className="demo-band">
+          <strong>Demo.</strong> Simulated documents in your browser. Nothing on your computer is read or renamed.{" "}
+          <a href={`${import.meta.env.BASE_URL}tour.html`}>Screenshot tour</a>
+        </p>
+      ) : null}
+      <header className="masthead">
         <a
-          aria-label="Folionym"
+          aria-label="Folionym, back to Source"
           className="brand"
           href={import.meta.env.BASE_URL}
           onClick={navigateHome}
         >
-          <span aria-hidden="true" className="brand-mark">
-            <svg fill="none" viewBox="0 0 24 24">
-              <rect
-                height="18"
-                rx="1.5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                width="16"
-                x="4"
-                y="3"
-              />
-              <path
-                d="M8 8h8M8 12h8M8 16h5"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="1.6"
-              />
-            </svg>
-          </span>
+          <BrandMark className="brand-mark" size={22} />
           <span className="brand-word">Folionym</span>
         </a>
-        <span className="brand-meta">
-          {isDemo ? "Interactive mock demo" : "Local rename instrument"}
-        </span>
-      </div>
 
-      <Stepper active={active} />
+        <Stepper active={active} />
 
-      {source ? (
-        <span className="visually-hidden">
-          Scope: {compactPath(source)}
-          {sourceMeta ? `, ${sourceMeta}` : ""}
-        </span>
-      ) : null}
-
-      <div className="header-actions">
-        {isDemo ? (
-          <a className="demo-tour-link" href={`${import.meta.env.BASE_URL}tour.html`}>
-            Screenshot tour
-          </a>
+        {source ? (
+          <span className="visually-hidden">
+            Scope: {compactPath(source)}
+            {sourceMeta ? `, ${sourceMeta}` : ""}
+          </span>
         ) : null}
-        <button
-          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-          className="theme-toggle"
-          onClick={onThemeChange}
-          type="button"
-        >
-          <span aria-hidden="true">{theme === "light" ? "◐" : "☼"}</span>
-          <span>{theme === "light" ? "Dark" : "Light"}</span>
-        </button>
-        <PrivacyChip external={external} />
-      </div>
-    </header>
+
+        <div className="header-actions">
+          <PrivacyChip external={external} />
+          <button
+            aria-label={`Switch to ${nextTheme} theme`}
+            className="icon-button theme-toggle"
+            onClick={onThemeChange}
+            title={`Switch to ${nextTheme} theme`}
+            type="button"
+          >
+            {theme === "light" ? <MoonIcon /> : <SunIcon />}
+          </button>
+        </div>
+      </header>
+    </>
   );
 }
 
@@ -134,12 +116,9 @@ export function AppChrome({
       return next;
     });
   };
-  // Preview fills Reading Room columns (filter rail · ledger · inspector).
+  // Preview fills the register's three columns (index · ledger · evidence).
   // Source and Apply use a single content surface under the shared header.
-  const bodyClass =
-    active === 2
-      ? "body-grid body-grid--preview"
-      : "body-grid body-grid--simple";
+  const bodyClass = active === 2 ? "body-grid body-grid--preview" : "body-grid body-grid--simple";
 
   return (
     <div className="app" data-theme={theme}>
