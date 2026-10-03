@@ -17,13 +17,23 @@ __pycache__/
 
 # Dependencies, builds, and generated metadata
 node_modules/
+.jnpm/
+.pnpm-store/
+.yarn/
 build/
 dist/
+/dist-demo/
+*.egg
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
 __pypackages__/
 *.tsbuildinfo
+.vite/
+.turbo/
+.parcel-cache/
+.eslintcache
+.stylelintcache
 
 # Test, coverage, and analysis output
 .coverage
@@ -98,26 +108,42 @@ credentials.local.*
 .secrets/
 *.pem
 *.key
+*.p8
 *.p12
 *.pfx
 *.jks
 *.keystore
+*.ppk
 credentials.json
 service-account*.json
 secrets.yaml
 secrets.yml
+.netrc
+.git-credentials
+.pypirc
 .tool-versions
 /.mcp.json
 
 # Editors and operating systems
 .vscode/
 .idea/
+.fleet/
+.history/
 .DS_Store
 ._*
 .AppleDouble
 .LSOverride
+.Spotlight-V100/
+.Trashes/
+.fseventsd/
+.DocumentRevisions-V100/
+.TemporaryItems/
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
 Thumbs.db
+ehthumbs.db
 Desktop.ini
+$RECYCLE.BIN/
 
 # Local development assistants and analysis workspaces
 AGENT.md
@@ -143,7 +169,6 @@ gemini.md
 .continue/
 .cursor/
 .kilo/
-.repowise/
 .serena/
 .windsurf/
 /.github/codex/
@@ -184,7 +209,6 @@ gemini.md
 /FINDINGS.md
 /LOG.md
 /REFACTOR_PLAN.md
-/PHYSICS_AUDIT.md
 /RELEASE_STATUS.md
 /REMEDIATION_PLAN.md
 /REMEDIATION_STATUS.md

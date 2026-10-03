@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { AppChrome, Button, PageLoader, RunOverlay } from "../components";
 import { WarningIcon } from "../icons";
 import { isLocalEndpoint } from "../lib/privacy";
@@ -26,17 +27,21 @@ function dateLabel(value: string): string {
 
 function processingFacts(settings: Settings) {
   return [
-    { label: "Naming", value: `${caseLabel(settings.case)} · ${dateLabel(settings.date_format)}` },
+    {
+      label: "Naming",
+      value: `${caseLabel(settings.case)} · ${dateLabel(settings.date_format)}`,
+    },
     { label: "Extraction", value: settings.use_ocr ? "OCR" : "Text" },
     {
       label: "Enrichment",
       value: settings.use_llm ? settings.llm_model || "Model" : "Rules only",
     },
-    { label: "Workers", value: settings.workers || "1" },
+    { label: "Plan", value: "Immutable" },
   ];
 }
 
 export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
+  const searchRef = useRef<HTMLInputElement>(null);
   const planId = sessionStorage.getItem("folionym.plan");
   const preview = usePreviewPlan(planId);
   const apply = usePreviewApply({
@@ -45,6 +50,50 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
     setError: preview.setError,
   });
 
+  useEffect(() => {
+    const isEditable = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditable(event.target)) return;
+      if (
+        event.key === "/" &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "a" &&
+        preview.selectableCount > 0 &&
+        !preview.allVisibleSelected
+      ) {
+        event.preventDefault();
+        preview.selectVisible();
+      }
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key === "Enter" &&
+        preview.selected.size > 0
+      ) {
+        event.preventDefault();
+        apply.openConfirm();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [
+    apply.openConfirm,
+    preview.allVisibleSelected,
+    preview.selectVisible,
+    preview.selectableCount,
+    preview.selected.size,
+  ]);
+
   if (preview.loading) return <PageLoader label="Loading preview" />;
   if (!preview.plan || preview.error) {
     return (
@@ -52,9 +101,13 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
         <WarningIcon size={28} />
         <h1>Preview unavailable</h1>
         <p>{preview.error || "This preview is no longer available."}</p>
-        <Button onClick={() => {
-          navigate("source");
-        }}>Start again</Button>
+        <Button
+          onClick={() => {
+            navigate("source");
+          }}
+        >
+          Start again
+        </Button>
       </div>
     );
   }
@@ -85,11 +138,14 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
             open={apply.confirmOpen}
             reviewCount={preview.plan.counts.review}
             selectedCount={preview.selected.size}
-            skippedFailedCount={preview.plan.counts.skipped + preview.plan.counts.failed}
+            skippedFailedCount={
+              preview.plan.counts.skipped + preview.plan.counts.failed
+            }
             source={preview.plan.source}
           />
           <RunOverlay
             error={apply.runError}
+            onRetry={apply.retryRun}
             onCancel={apply.cancelRun}
             onClose={apply.closeRun}
             run={apply.run}
@@ -108,9 +164,11 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
           }}
           onFilterChange={preview.setFilter}
           plan={preview.plan}
-          selectedCount={preview.selected.size}
         />
         <Ledger
+          page={preview.page}
+          totalItems={preview.totalItems}
+          onPageChange={preview.setPage}
           activeId={preview.activeId}
           allVisibleSelected={preview.allVisibleSelected}
           error={preview.error}
@@ -126,6 +184,7 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
           onToggle={preview.toggle}
           plan={preview.plan}
           query={preview.query}
+          searchRef={searchRef}
           selectableCount={preview.selectableCount}
           selected={preview.selected}
           visibleItems={preview.visibleItems}

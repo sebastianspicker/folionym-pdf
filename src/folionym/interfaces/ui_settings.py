@@ -8,7 +8,14 @@ from pathlib import Path
 from threading import Event
 
 from ..infrastructure.private_io import atomic_write_private_text
-from ..settings import RenamerConfig, build_config
+from ..settings import (
+    DATE_LOCALE_CHOICES,
+    DESIRED_CASE_CHOICES,
+    LANGUAGE_CHOICES,
+    RenamerConfig,
+    build_config,
+    preset_mode_values,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +60,9 @@ DEFAULT_UI_SETTINGS: UiSettingsSnapshot = {
     "vision_first": False,
     "acknowledged_external_endpoint": "",
 }
-_VALID_UI_LANGUAGES = frozenset({"de", "en"})
-_VALID_UI_CASES = frozenset({"camelCase", "kebabCase", "snakeCase"})
-_VALID_UI_DATE_FORMATS = frozenset({"dmy", "mdy"})
+_VALID_UI_LANGUAGES = frozenset(LANGUAGE_CHOICES)
+_VALID_UI_CASES = frozenset(DESIRED_CASE_CHOICES)
+_VALID_UI_DATE_FORMATS = frozenset(DATE_LOCALE_CHOICES)
 
 
 def _read_settings(path: Path) -> UiSettingsSnapshot:
@@ -114,43 +121,47 @@ def build_config_from_ui_settings(
     dry_run: bool,
     manual_mode: bool = False,
 ) -> RenamerConfig:
-    """Translate one persisted UI snapshot into the canonical rename configuration."""
-    return build_config(
-        {
-            "language": snapshot["language"],
-            "desired_case": snapshot["case"],
-            "project": snapshot["project"],
-            "version": snapshot["version"],
-            "date_locale": snapshot["date_format"],
-            "dry_run": dry_run,
-            "use_llm": snapshot["use_llm"],
-            "use_ocr": snapshot["use_ocr"],
-            "use_pdf_metadata_for_date": snapshot["use_pdf_metadata_date"],
-            "use_structured_fields": snapshot["use_structured_fields"],
-            "skip_if_already_named": snapshot["skip_already_named"],
-            "recursive": snapshot["recursive"],
-            "backup_dir": snapshot["backup_dir"],
-            "rename_log_path": snapshot["rename_log"],
-            "export_metadata_path": snapshot["export_metadata"],
-            "summary_json_path": snapshot["summary_json"],
-            "rules_file": snapshot["rules_file"],
-            "post_rename_hook": snapshot["post_rename_hook"],
-            "llm_base_url": snapshot["llm_url"],
-            "llm_model": snapshot["llm_model"],
-            "llm_timeout_s": snapshot["llm_timeout"],
-            "max_tokens_for_extraction": snapshot["max_tokens"],
-            "max_content_chars": snapshot["max_content_chars"],
-            "max_content_tokens": snapshot["max_content_tokens"],
-            "workers": snapshot["workers"],
-            "max_filename_chars": snapshot["max_filename_chars"],
-            "write_pdf_metadata": snapshot["write_pdf_metadata"],
-            "filename_template": snapshot["template"],
-            "use_vision_fallback": snapshot["use_vision_fallback"],
-            "simple_naming_mode": snapshot["simple_naming_mode"],
-            "vision_first": snapshot["vision_first"],
-            "preset": snapshot["preset"],
-            "manual_mode": manual_mode,
-            "interactive": manual_mode,
-            "stop_event": stop_event,
-        }
-    )
+    """Translate one persisted UI snapshot into the canonical rename configuration.
+
+    The form always submits every value, so the selected preset's mode switches
+    replace the matching form values instead of ranking below them.
+    """
+    raw: dict[str, object] = {
+        "language": snapshot["language"],
+        "desired_case": snapshot["case"],
+        "project": snapshot["project"],
+        "version": snapshot["version"],
+        "date_locale": snapshot["date_format"],
+        "dry_run": dry_run,
+        "use_llm": snapshot["use_llm"],
+        "use_ocr": snapshot["use_ocr"],
+        "use_pdf_metadata_for_date": snapshot["use_pdf_metadata_date"],
+        "use_structured_fields": snapshot["use_structured_fields"],
+        "skip_if_already_named": snapshot["skip_already_named"],
+        "recursive": snapshot["recursive"],
+        "backup_dir": snapshot["backup_dir"],
+        "rename_log_path": snapshot["rename_log"],
+        "export_metadata_path": snapshot["export_metadata"],
+        "summary_json_path": snapshot["summary_json"],
+        "rules_file": snapshot["rules_file"],
+        "post_rename_hook": snapshot["post_rename_hook"],
+        "llm_base_url": snapshot["llm_url"],
+        "llm_model": snapshot["llm_model"],
+        "llm_timeout_s": snapshot["llm_timeout"],
+        "max_tokens_for_extraction": snapshot["max_tokens"],
+        "max_content_chars": snapshot["max_content_chars"],
+        "max_content_tokens": snapshot["max_content_tokens"],
+        "workers": snapshot["workers"],
+        "max_filename_chars": snapshot["max_filename_chars"],
+        "write_pdf_metadata": snapshot["write_pdf_metadata"],
+        "filename_template": snapshot["template"],
+        "use_vision_fallback": snapshot["use_vision_fallback"],
+        "simple_naming_mode": snapshot["simple_naming_mode"],
+        "vision_first": snapshot["vision_first"],
+        "preset": snapshot["preset"],
+        "manual_mode": manual_mode,
+        "interactive": manual_mode,
+        "stop_event": stop_event,
+    }
+    raw.update(preset_mode_values(str(snapshot["preset"] or "")))
+    return build_config(raw)

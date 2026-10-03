@@ -267,7 +267,7 @@
 .row.is-active {
   border-color: var(--select-edge);
   background: linear-gradient(90deg, rgb(232 240 247 / 95%), rgb(232 240 247 / 55%));
-  box-shadow: inset 3px 0 0 var(--indigo);
+  box-shadow: inset 3px 0 0 var(--verdigris);
 }
 
 .row-check {
@@ -324,3 +324,5 @@
   font-size: 14px;
   text-align: center;
 }
+
+.ledger-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; font-size: 12px; }

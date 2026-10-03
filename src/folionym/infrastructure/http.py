@@ -7,8 +7,14 @@ import re
 from dataclasses import dataclass
 from urllib.parse import SplitResult, urlsplit
 
+import requests
+
 _URL_UNSAFE_CHARACTER_RE = re.compile(r"[\x00-\x20\x7f\\\\]")
 _HOST_LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", re.IGNORECASE)
+
+HttpRequestError = requests.RequestException
+HttpTimeoutError = requests.Timeout
+"""Base class of transport errors raised by ``post_json_without_redirects``."""
 
 
 @dataclass(frozen=True)
@@ -95,3 +101,17 @@ def validate_http_endpoint(value: str) -> ValidatedHttpEndpoint:
         hostname=hostname,
         ip_host=_validated_ip_host(hostname),
     )
+
+
+def post_json_without_redirects(url: str, payload: dict[str, object], *, timeout: float) -> None:
+    """POST JSON without proxy environment or redirects; raise ``requests`` errors on failure.
+
+    The caller owns URL policy. Any 3xx response raises ``requests.TooManyRedirects`` and
+    any 4xx/5xx response raises ``requests.HTTPError``.
+    """
+    with requests.Session() as session:
+        session.trust_env = False
+        resp = session.post(url, json=payload, timeout=timeout, allow_redirects=False)
+        if 300 <= resp.status_code < 400:
+            raise requests.TooManyRedirects("HTTP redirects are disabled")
+        resp.raise_for_status()

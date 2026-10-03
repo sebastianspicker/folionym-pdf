@@ -1,56 +1,22 @@
-"""Constants, CSS, and log-line formatters for the Rich/Textual TUI."""
+"""Constants and CSS for the Rich/Textual TUI."""
 
 from __future__ import annotations
 
-import re
-
-from rich.markup import escape as _escape_markup
 from textual.theme import Theme
 
-PROCESS_RE = re.compile(r"Processing\s+(\d+)/(\d+)\s*:")
-_RENAME_LOG_RE = re.compile(r"Renamed '(.+?)' to '(.+?)'")
-_DRYRUN_LOG_RE = re.compile(r"Dry-run: would rename '(.+?)' to '(.+?)'")
+from ...settings import DATE_LOCALE_CHOICES, DESIRED_CASE_CHOICES, LANGUAGE_CHOICES, WORKFLOW_PRESET_CHOICES
+
 PREVIEW_COLOR = "#2468E5"
 SUCCESS_COLOR = "#087F70"
 WARNING_COLOR = "#A45D00"
 ERROR_COLOR = "#B42318"
 
-
-def _format_rename_match(m: re.Match[str]) -> str:
-    """Escape captured filenames before adding Rich markup to a rename message."""
-    old = _escape_markup(m.group(1))
-    new = _escape_markup(m.group(2))
-    return (
-        f"[{SUCCESS_COLOR}]Renamed[/{SUCCESS_COLOR}] [dim]{old}[/dim] "
-        f"[{SUCCESS_COLOR} bold]->[/{SUCCESS_COLOR} bold] [bold]{new}[/bold]"
-    )
-
-
-def _format_dryrun_match(m: re.Match[str]) -> str:
-    """Escape captured filenames before adding Rich markup to a dry-run message."""
-    old = _escape_markup(m.group(1))
-    new = _escape_markup(m.group(2))
-    return (
-        f"[{PREVIEW_COLOR}]Dry-run[/{PREVIEW_COLOR}] [dim]{old}[/dim] "
-        f"[{PREVIEW_COLOR} bold]->[/{PREVIEW_COLOR} bold] [bold]{new}[/bold]"
-    )
-
-
-_LANGUAGES = [("German (de)", "de"), ("English (en)", "en")]
-_CASES = [
-    ("kebabCase", "kebabCase"),
-    ("snakeCase", "snakeCase"),
-    ("camelCase", "camelCase"),
-]
-_DATE_FORMATS = [("Day-Month-Year (dmy)", "dmy"), ("Month-Day-Year (mdy)", "mdy")]
-_PRESETS = [
-    ("(none)", ""),
-    ("high-confidence-heuristic", "high-confidence-heuristic"),
-    ("scanned", "scanned"),
-    ("fast", "fast"),
-    ("accurate", "accurate"),
-    ("batch", "batch"),
-]
+_LANGUAGE_LABELS = {"de": "German (de)", "en": "English (en)"}
+_DATE_FORMAT_LABELS = {"dmy": "Day-Month-Year (dmy)", "mdy": "Month-Day-Year (mdy)"}
+_LANGUAGES = [(_LANGUAGE_LABELS[code], code) for code in LANGUAGE_CHOICES]
+_CASES = [(case, case) for case in DESIRED_CASE_CHOICES]
+_DATE_FORMATS = [(_DATE_FORMAT_LABELS[code], code) for code in DATE_LOCALE_CHOICES]
+_PRESETS = [("(none)", ""), *((preset, preset) for preset in WORKFLOW_PRESET_CHOICES)]
 
 FOLIONYM_THEME = Theme(
     name="folionym-ledger",

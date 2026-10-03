@@ -17,6 +17,9 @@ export function usePlanLoader(planId: string | null) {
     }
 
     let mounted = true;
+    setLoading(true);
+    setError("");
+    setPlan(null);
     const loadPlan = async () => {
       try {
         const next = await api.plan(planId);

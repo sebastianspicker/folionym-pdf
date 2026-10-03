@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from ..rename_ops import FILENAME_UNSAFE_RE
+from ..infrastructure.filenames import FILENAME_UNSAFE_RE
 
 _AMOUNT_MAX = 1_000_000.0
 _COMPANY_SUFFIXES = r"(?:GmbH|AG|Inc\.?|Ltd\.?|LLC)"

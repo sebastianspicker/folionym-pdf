@@ -9,11 +9,13 @@ export function RunOverlay({
   error,
   onCancel,
   onClose,
+  onRetry,
 }: {
   run: Run | null;
   error: string;
   onCancel: () => void;
   onClose: () => void;
+  onRetry: () => void;
 }) {
   const isTerminal = run ? terminalStates.has(run.state) : false;
   const percentage = run?.total ? Math.round((run.completed / run.total) * 100) : 0;
@@ -29,7 +31,7 @@ export function RunOverlay({
       title={run?.kind === "apply" ? "Applying names" : "Building preview"}
     >
       {error ? (
-        <ErrorBanner message={error} />
+        <><ErrorBanner message={error} /><Button onClick={onRetry}>Retry connection</Button></>
       ) : (
         <div className="run-status">
           <div className="run-status__row">

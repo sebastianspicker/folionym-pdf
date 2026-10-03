@@ -28,8 +28,8 @@ export function ApplyConfirmDialog({
       footer={
         <>
           <Button onClick={onClose}>Keep reviewing</Button>
-          <Button onClick={onConfirm} variant="danger">
-            Rename files
+          <Button onClick={onConfirm} variant="primary">
+            Apply {selectedCount} {nameLabel}
           </Button>
         </>
       }
@@ -37,37 +37,32 @@ export function ApplyConfirmDialog({
       open={open}
       title={`Write ${selectedCount} selected ${nameLabel}?`}
     >
-      <div className="confirm-list">
+      <div className="apply-confirmation">
         <p>
-          Folionym will rename only the checked files to their exact reviewed targets. Changed sources and new
-          collisions fail safely.
+          <strong>{selectedCount} files</strong> in{" "}
+          <code>{compactPath(source)}</code> will be renamed to their exact
+          reviewed targets. Changed sources and new collisions fail safely.
         </p>
-        <div>
-          <strong>{selectedCount}</strong>
-          <span>selected</span>
-        </div>
-        <div>
-          <strong>{reviewCount}</strong>
-          <span>need review</span>
-        </div>
-        <div>
-          <strong>{skippedFailedCount}</strong>
-          <span>not applicable</span>
-        </div>
-        <div className="confirm-facts">
+        <dl className="confirm-summary">
           <div>
-            <span>Scope</span>
-            <code>{compactPath(source)}</code>
+            <dt>Plan</dt>
+            <dd>Exact targets · no recompute</dd>
           </div>
           <div>
-            <span>Mode</span>
-            <strong>Exact targets · no recompute</strong>
+            <dt>Review</dt>
+            <dd>{reviewCount} marked for attention</dd>
           </div>
           <div>
-            <span>Privacy</span>
-            <strong>{localOnly ? "Local only" : "External model"}</strong>
+            <dt>Untouched</dt>
+            <dd>{skippedFailedCount} skipped or failed</dd>
           </div>
-        </div>
+          <div>
+            <dt>Privacy</dt>
+            <dd>
+              {localOnly ? "Local only" : "External model used during Preview"}
+            </dd>
+          </div>
+        </dl>
       </div>
     </Modal>
   );

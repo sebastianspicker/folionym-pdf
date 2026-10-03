@@ -10,12 +10,12 @@ from pathlib import Path
 
 from .backups import _write_backup
 from .filesystem import _copy_to_reserved_target_then_unlink, _rename_without_overwrite
-from .naming import (
+from .options import (
     MAX_RENAME_RETRIES,
     RenameApplyOptions,
     RenameAttemptState,
     RenameRetryContext,
-    _validate_path_within_parent,
+    validate_path_within_parent,
 )
 
 logger = logging.getLogger("folionym.rename_ops")
@@ -31,7 +31,7 @@ def apply_single_rename(file_path: Path, base: str, options: RenameApplyOptions)
 
 def apply_exact_rename(source: Path, target: Path) -> None:
     """Rename within one directory without overwriting or choosing another target."""
-    _validate_path_within_parent(target, source.parent)
+    validate_path_within_parent(target, source.parent)
     if source.parent.resolve() != target.parent.resolve():
         raise ValueError(f"Cross-directory rename denied: {source} -> {target}")
     _rename_without_overwrite(source, target)
@@ -41,7 +41,7 @@ def _initialize_rename_attempt(file_path: Path, base: str) -> tuple[RenameAttemp
     """Build and validate the first collision candidate for a source file."""
     suffix = file_path.suffix
     state = RenameAttemptState(base, file_path.with_name(base + suffix), 0)
-    _validate_path_within_parent(state.target, file_path.parent)
+    validate_path_within_parent(state.target, file_path.parent)
     return state, RenameRetryContext(file_path, base, suffix)
 
 

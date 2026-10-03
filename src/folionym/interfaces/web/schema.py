@@ -80,7 +80,7 @@ class DirectoryEntry(BaseModel):
 
     name: str
     path: str
-    pdf_count: int = 0
+    pdf_count: int | None = 0
 
 
 class DirectoryListing(BaseModel):

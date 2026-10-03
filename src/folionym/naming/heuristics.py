@@ -1,94 +1,56 @@
-"""Deterministic category scoring and heuristic/LLM category reconciliation."""
+"""Heuristic/LLM category reconciliation and LLM category normalization."""
 
 from __future__ import annotations
 
 import json
 import logging
 import re
-import sys
-import threading
-from dataclasses import dataclass
-from typing import Any, cast
+from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
-from .scoring import (
-    HeuristicRule,
-    HeuristicScorer,
-    _score_text,
-    load_heuristic_rules,
-    load_heuristic_rules_for_language,
-)
+from ..infrastructure.resources import category_aliases_path
+from .scoring import PLACEHOLDER_CATEGORIES
 
 logger = logging.getLogger(__name__)
 
 
 __all__ = [
+    "CategoryCombineOptions",
     "CategoryCombineParams",
-    "HeuristicRule",
-    "HeuristicScorer",
-    "_score_text",
-    "clear_category_aliases_cache",
     "combine_categories",
-    "load_heuristic_rules",
-    "load_heuristic_rules_for_language",
     "normalize_llm_category",
 ]
-
-# Global cache for category aliases (loaded once from category_aliases.json).
-_CATEGORY_ALIASES: dict[str, str] | None = None
-_CATEGORY_ALIASES_LOCK = threading.Lock()
-_CATEGORY_ALIASES_MTIME_NS: int = 0
 
 
 def _load_category_aliases() -> dict[str, str]:
     """Load alias map: LLM output (lowercase, _) -> heuristic category."""
-    module = sys.modules[__name__]
-    cached_aliases = cast(dict[str, str] | None, module.__dict__["_CATEGORY_ALIASES"])
     path = _category_aliases_path_or_none()
     if path is None:
-        if cached_aliases is None:
-            cached_aliases = {}
-            module.__dict__["_CATEGORY_ALIASES"] = cached_aliases
-        return cached_aliases
-
-    current_mtime_ns = _path_mtime_ns(path)
-    cached_mtime_ns = int(module.__dict__["_CATEGORY_ALIASES_MTIME_NS"])
-
-    if cached_aliases is not None and current_mtime_ns == cached_mtime_ns:
-        return cached_aliases
-    with _CATEGORY_ALIASES_LOCK:
-        cached_aliases = cast(dict[str, str] | None, module.__dict__["_CATEGORY_ALIASES"])
-        cached_mtime_ns = int(module.__dict__["_CATEGORY_ALIASES_MTIME_NS"])
-        if cached_aliases is not None and current_mtime_ns == cached_mtime_ns:
-            return cached_aliases
-        aliases = _read_category_aliases(path)
-        module.__dict__["_CATEGORY_ALIASES"] = aliases
-        module.__dict__["_CATEGORY_ALIASES_MTIME_NS"] = current_mtime_ns
-        return aliases
+        return {}
+    return _category_aliases_cached(path, _path_mtime_ns(path))
 
 
-def clear_category_aliases_cache() -> None:
-    """Clear the cached category alias map."""
-    with _CATEGORY_ALIASES_LOCK:
-        module = sys.modules[__name__]
-        module.__dict__["_CATEGORY_ALIASES"] = None
-        module.__dict__["_CATEGORY_ALIASES_MTIME_NS"] = 0
+# Include mtime in the cache key so local alias-file edits are visible to watch mode.
+@lru_cache(maxsize=4)
+def _category_aliases_cached(path: Path, _mtime_ns: int) -> dict[str, str]:
+    """Read category aliases through the mtime-sensitive cache."""
+    return _read_category_aliases(path)
 
 
-def _category_aliases_path_or_none() -> Any | None:
+def _category_aliases_path_or_none() -> Path | None:
     """Return the category-alias file path when available."""
     try:
-        from ..infrastructure.resources import category_aliases_path
-
         return category_aliases_path()
     except (
-        ImportError,
         ValueError,
         FileNotFoundError,
     ):
         return None
 
 
-def _path_mtime_ns(path: Any) -> int:
+def _path_mtime_ns(path: Path) -> int:
     """Return a file modification timestamp, or zero when unavailable."""
     try:
         return path.stat().st_mtime_ns if path.exists() else 0
@@ -96,7 +58,7 @@ def _path_mtime_ns(path: Any) -> int:
         return 0
 
 
-def _read_category_aliases(path: Any) -> dict[str, str]:
+def _read_category_aliases(path: Path) -> dict[str, str]:
     """Load and normalize category aliases, returning an empty map on failure."""
     try:
         if not path.exists():
@@ -124,7 +86,7 @@ def normalize_llm_category(cat_llm: str | None, *, _aliases: dict[str, str] | No
     # Preserve hierarchy markers as token separators instead of deleting them.
     cleaned = cat_llm.replace("/", "_")
     key = re.sub(r"[^\w\s-]", "", cleaned).strip().lower().replace(" ", "_")
-    if not key or key in {"document", "unknown", "na"}:
+    if not key or key in PLACEHOLDER_CATEGORIES:
         return key if key else "unknown"
     aliases = _aliases if _aliases is not None else _load_category_aliases()
     return aliases.get(key, key)
@@ -143,13 +105,36 @@ def _overlap_count(category_tokens: set[str], context_tokens: set[str]) -> int:
     return len(category_tokens & context_tokens)
 
 
+@dataclass(frozen=True)
+class CategoryCombineParams:
+    """Parameters that control how heuristic and LLM categories are merged."""
+
+    prefer_llm: bool = True
+    min_heuristic_score: float = 0.0
+    heuristic_override_min_score: float | None = None
+    heuristic_override_min_gap: float | None = None
+    heuristic_score_weight: float = 1.0
+    use_keyword_overlap: bool = False
+
+
+@dataclass(frozen=True)
+class CategoryCombineOptions:
+    """Per-document heuristic signals plus the configured combination parameters."""
+
+    heuristic_score: float | None = None
+    heuristic_gap: float | None = None
+    params: CategoryCombineParams = field(default_factory=CategoryCombineParams)
+    context_for_overlap: str | None = None
+    category_parent_map: dict[str, str] | None = None
+
+
 def _combine_apply_heuristic_override(
     cat_heuristic: str,
     cat_llm_norm: str,
     opts: CategoryCombineOptions,
-    params: CategoryCombineParams,
 ) -> str | None:
     """If high-confidence heuristic override applies, return cat_heuristic; else None."""
+    params = opts.params
     if params.heuristic_override_min_score is None or params.heuristic_override_min_gap is None:
         return None
     if opts.heuristic_score is None or opts.heuristic_gap is None:
@@ -217,47 +202,35 @@ def _combine_agreement_or_parent(
 def _combine_resolve_conflict(
     cat_llm_norm: str,
     cat_heuristic: str,
-    options: ConflictResolutionOptions | None = None,
+    opts: CategoryCombineOptions,
 ) -> str:
     """Resolve conflict via keyword overlap or preference."""
-    opts = options or ConflictResolutionOptions()
     context_pick = _context_conflict_pick(cat_llm_norm, cat_heuristic, opts)
     if context_pick is not None:
         return context_pick
-    return _preference_conflict_pick(cat_llm_norm, cat_heuristic, opts.prefer_llm)
-
-
-@dataclass(frozen=True)
-class ConflictResolutionOptions:
-    """Configure deterministic resolution of category conflicts."""
-
-    prefer_llm: bool = True
-    context_for_overlap: str | None = None
-    use_keyword_overlap: bool = False
-    heuristic_score: float | None = None
-    heuristic_score_weight: float = 1.0
+    return _preference_conflict_pick(cat_llm_norm, cat_heuristic, opts.params.prefer_llm)
 
 
 def _context_conflict_pick(
     cat_llm_norm: str,
     cat_heuristic: str,
-    options: ConflictResolutionOptions,
+    opts: CategoryCombineOptions,
 ) -> str | None:
     """Resolve a conflict from overlap context when enabled."""
-    if not options.context_for_overlap:
+    if not opts.context_for_overlap:
         return None
-    if options.use_keyword_overlap:
-        return _overlap_conflict_pick(cat_llm_norm, cat_heuristic, options)
+    if opts.params.use_keyword_overlap:
+        return _overlap_conflict_pick(cat_llm_norm, cat_heuristic, opts)
     return None
 
 
 def _overlap_conflict_pick(
     cat_llm_norm: str,
     cat_heuristic: str,
-    options: ConflictResolutionOptions,
+    opts: CategoryCombineOptions,
 ) -> str:
     """Choose the category favored by weighted keyword overlap."""
-    overlap_llm, overlap_heur_weighted = _weighted_overlap_scores(cat_llm_norm, cat_heuristic, options)
+    overlap_llm, overlap_heur_weighted = _weighted_overlap_scores(cat_llm_norm, cat_heuristic, opts)
     if overlap_llm > overlap_heur_weighted:
         logger.info(
             "Conflict: LLM=%s, Heuristic=%s. Overlap favors LLM (%d vs %.2f).",
@@ -286,13 +259,13 @@ def _overlap_conflict_pick(
 def _weighted_overlap_scores(
     cat_llm_norm: str,
     cat_heuristic: str,
-    options: ConflictResolutionOptions,
+    opts: CategoryCombineOptions,
 ) -> tuple[int, float]:
     """Return LLM overlap and confidence-weighted heuristic overlap."""
-    ctx_tokens = _tokenize_for_overlap(options.context_for_overlap or "")
+    ctx_tokens = _tokenize_for_overlap(opts.context_for_overlap or "")
     overlap_llm = _overlap_count(_tokenize_for_overlap(cat_llm_norm), ctx_tokens)
     overlap_heur = _overlap_count(_tokenize_for_overlap(cat_heuristic), ctx_tokens)
-    score_bonus = _heuristic_score_bonus(options.heuristic_score, options.heuristic_score_weight)
+    score_bonus = _heuristic_score_bonus(opts.heuristic_score, opts.params.heuristic_score_weight)
     return overlap_llm, overlap_heur + score_bonus
 
 
@@ -327,29 +300,6 @@ def _log_category_conflict(
     logger.info("CategoryConflict chosen=%s llm=%s heuristic=%s", chosen_label, cat_llm_norm, cat_heuristic)
 
 
-@dataclass(frozen=True)
-class CategoryCombineParams:
-    """Parameters that control how heuristic and LLM categories are merged."""
-
-    prefer_llm: bool = True
-    min_heuristic_score: float = 0.0
-    heuristic_override_min_score: float | None = None
-    heuristic_override_min_gap: float | None = None
-    heuristic_score_weight: float = 1.0
-    use_keyword_overlap: bool = False
-
-
-@dataclass(frozen=True)
-class CategoryCombineOptions:
-    """Configure how heuristic and LLM category signals are combined."""
-
-    heuristic_score: float | None = None
-    heuristic_gap: float | None = None
-    params: CategoryCombineParams | None = None
-    context_for_overlap: str | None = None
-    category_parent_map: dict[str, str] | None = None
-
-
 def combine_categories(
     cat_llm: str,
     cat_heur: str,
@@ -357,29 +307,23 @@ def combine_categories(
 ) -> str:
     """Merge heuristic and LLM categories using configurable conflict resolution, parent matching, and overlap."""
     opts = options or CategoryCombineOptions()
-    params = opts.params or CategoryCombineParams()
     cat_llm_norm = normalize_llm_category(cat_llm)
-    early_result = _combine_early_result(cat_llm_norm, cat_heur, opts.heuristic_score, params)
+    early_result = _combine_early_result(cat_llm_norm, cat_heur, opts.heuristic_score, opts.params)
     if early_result is not None:
         return early_result
 
-    override = _combine_apply_heuristic_override(
-        cat_heur,
-        cat_llm_norm,
-        opts,
-        params,
-    )
+    override = _combine_apply_heuristic_override(cat_heur, cat_llm_norm, opts)
     if override is not None:
         return override
     agreed = _combine_agreement_or_parent(cat_llm_norm, cat_heur, opts.category_parent_map)
     if agreed is not None:
         return agreed
-    return _combine_resolve_conflict(cat_llm_norm, cat_heur, _conflict_options(params, opts))
+    return _combine_resolve_conflict(cat_llm_norm, cat_heur, opts)
 
 
 def _is_valid_llm_category(cat_llm_norm: str) -> bool:
     """Return whether an LLM category is specific and usable."""
-    return cat_llm_norm not in {"document", "unknown", "na", ""}
+    return bool(cat_llm_norm) and cat_llm_norm not in PLACEHOLDER_CATEGORIES
 
 
 def _combine_early_result(
@@ -420,17 +364,3 @@ def _low_score_category_pick(
         cat_llm_norm,
     )
     return cat_heur
-
-
-def _conflict_options(
-    params: CategoryCombineParams,
-    options: CategoryCombineOptions,
-) -> ConflictResolutionOptions:
-    """Build conflict-resolution options from public combination options."""
-    return ConflictResolutionOptions(
-        prefer_llm=params.prefer_llm,
-        context_for_overlap=options.context_for_overlap,
-        use_keyword_overlap=params.use_keyword_overlap,
-        heuristic_score=options.heuristic_score,
-        heuristic_score_weight=params.heuristic_score_weight,
-    )

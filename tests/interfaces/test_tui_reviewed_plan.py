@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from folionym.application.models import ApplyReport, PreviewItem, PreviewPlan, PreviewStatus
+from folionym.application.models import PreviewItem, PreviewPlan, PreviewStatus
 from folionym.config import build_config
 from folionym.interfaces.tui.reviewed_plan import DirectoryReviewedPlanController
 
@@ -64,57 +64,27 @@ def test_retained_plan_rows_map_directly_from_immutable_items_and_apply_exact_re
         ("ready-excluded", "READY", "excluded.pdf", "excluded-reviewed.pdf"),
         ("review", "REVIEW", "review.pdf", "review-reviewed.pdf"),
     ]
-    seen: list[tuple[PreviewPlan, tuple[str, ...]]] = []
-
-    def apply_exact(retained_plan: PreviewPlan, item_ids: tuple[str, ...]) -> ApplyReport:
-        seen.append((retained_plan, item_ids))
-        return ApplyReport(
-            id="report-1",
-            plan_id=retained_plan.id,
-            source=retained_plan.source,
-            started_at=datetime.now(UTC),
-            completed_at=datetime.now(UTC),
-            items=(),
-        )
-
-    assert controller.apply(apply_exact) is not None
-    assert seen == [(plan, ("ready-included",))]
+    assert controller.require_apply() == (plan, ("ready-included",))
 
 
 def test_material_control_invalidation_discards_the_retained_plan(tmp_path: Path) -> None:
     controller = DirectoryReviewedPlanController()
     controller.retain(_plan(tmp_path), complete=True)
 
-    controller.invalidate("Source or settings changed after Preview.")
+    controller.clear()
 
     assert controller.plan is None
     assert controller.rows() == ()
-    assert controller.invalidation_reason == "Source or settings changed after Preview."
     with pytest.raises(ValueError, match="Preview the folder"):
         controller.require_apply()
 
 
-def test_no_plan_and_partial_plan_refuse_apply_without_calling_a_mutator(tmp_path: Path) -> None:
+def test_no_plan_and_partial_plan_refuse_apply(tmp_path: Path) -> None:
     controller = DirectoryReviewedPlanController()
-    calls = 0
-
-    def mutator(_plan: PreviewPlan, _item_ids: tuple[str, ...]) -> ApplyReport:
-        nonlocal calls
-        calls += 1
-        return ApplyReport(
-            id="report-2",
-            plan_id=_plan.id,
-            source=_plan.source,
-            started_at=datetime.now(UTC),
-            completed_at=datetime.now(UTC),
-            items=(),
-        )
 
     with pytest.raises(ValueError, match="Preview the folder"):
-        controller.apply(mutator)
+        controller.require_apply()
 
     controller.retain(_plan(tmp_path), complete=False)
     with pytest.raises(ValueError, match="incomplete or cancelled"):
-        controller.apply(mutator)
-
-    assert calls == 0
+        controller.require_apply()

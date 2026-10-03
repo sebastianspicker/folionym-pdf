@@ -7,41 +7,16 @@ import io
 import json
 import logging
 import re
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ..infrastructure.private_io import atomic_write_private_text, open_private_append_text
+from ..infrastructure.private_io import atomic_write_private_text
 from ..settings import RenamerConfig
 
 _CSV_FORMULA_TRIGGERS = frozenset("=+-@|")
 _CSV_CONTROL_CHARS_RE = re.compile(r"[\t\r\n]")
 logger = logging.getLogger(__name__)
-
-
-def _write_rename_log_entry(rename_log_path: str | Path, file_path: Path, target: Path) -> None:
-    """Append one private tab-delimited rename record with unambiguous path fields."""
-    file_path_str = str(file_path)
-    target_str = str(target)
-    if any(delimiter in file_path_str for delimiter in ("\t", "\n", "\r")):
-        logger.warning(
-            "Cannot write rename log entry for %s: original path contains tab or newline "
-            "characters (unsupported by the tab-delimited log format). Undo will not be "
-            "available for this file.",
-            file_path,
-        )
-        return
-    if any(delimiter in target_str for delimiter in ("\t", "\n", "\r")):
-        logger.warning(
-            "Cannot write rename log entry for %s: target path contains tab or newline "
-            "characters (unsupported by the tab-delimited log format). Undo will not be "
-            "available for this file.",
-            target,
-        )
-        return
-    with open_private_append_text(rename_log_path) as handle:
-        handle.write(f"{file_path_str}\t{target_str}\n")
 
 
 @dataclass
@@ -94,7 +69,7 @@ def _write_json_or_csv(path: Path, rows: list[Any], csv_fieldnames: list[str] | 
     atomic_write_private_text(path, output.getvalue())
 
 
-def _write_summary_json(
+def write_summary_json(
     summary_path: str | Path | None,
     summary_data: RenameSummaryData,
 ) -> None:
@@ -117,7 +92,7 @@ def _write_summary_json(
         logger.warning("Could not write summary JSON %s: %s", target, exc)
 
 
-def _append_export_row(
+def append_export_row(
     export_rows: list[dict[str, object]],
     *,
     file_path: Path,
@@ -142,7 +117,7 @@ def _append_export_row(
     )
 
 
-def _write_export_metadata(config: RenamerConfig, output: RenameOutputData) -> None:
+def write_export_metadata(config: RenamerConfig, output: RenameOutputData) -> None:
     """Write non-empty export rows as private JSON or CSV when configured."""
     export_metadata_path = config.output.paths.export_metadata_path
     if export_metadata_path and output.export_rows:
@@ -185,50 +160,11 @@ def _log_summary(output: RenameOutputData) -> None:
     )
 
 
-def _print_rich_summary(output: RenameOutputData) -> None:
-    """Print a colorized run summary to stderr with Rich."""
-    from rich.console import Console
-
-    _con = Console(stderr=True)
-    _con.print()
-    parts = [f"[bold]{output.processed_count}[/bold] processed"]
-    if output.renamed_count:
-        parts.append(f"[green]{output.renamed_count} renamed[/green]")
-    else:
-        parts.append(f"{output.renamed_count} renamed")
-    if output.skipped_count:
-        parts.append(f"[yellow]{output.skipped_count} skipped[/yellow]")
-    else:
-        parts.append(f"{output.skipped_count} skipped")
-    if output.failed_count:
-        parts.append(f"[red]{output.failed_count} failed[/red]")
-    else:
-        parts.append(f"{output.failed_count} failed")
-    _con.print("[bold]Summary:[/bold] " + ", ".join(parts))
-
-
-def _print_plain_summary(output: RenameOutputData) -> None:
-    """Print a plain-text run summary to stderr."""
-    print(
-        f"Summary: {output.processed_count} processed, {output.renamed_count} renamed, "
-        f"{output.skipped_count} skipped, {output.failed_count} failed.",
-        file=sys.stderr,
-    )
-
-
-def _print_summary(output: RenameOutputData) -> None:
-    """Print a Rich summary when available, otherwise use plain text."""
-    try:
-        _print_rich_summary(output)
-    except ImportError:
-        _print_plain_summary(output)
-
-
-def _write_rename_outputs(config: RenamerConfig, directory: Path, output: RenameOutputData) -> None:
+def write_rename_outputs(config: RenamerConfig, directory: Path, output: RenameOutputData) -> None:
     """Write export metadata, plan file, and summary JSON after rename loop completes."""
-    _write_export_metadata(config, output)
+    write_export_metadata(config, output)
     _write_plan_file(config, output)
-    _write_summary_json(
+    write_summary_json(
         config.output.paths.summary_json_path,
         RenameSummaryData(
             directory=directory,
@@ -241,4 +177,3 @@ def _write_rename_outputs(config: RenamerConfig, directory: Path, output: Rename
         ),
     )
     _log_summary(output)
-    _print_summary(output)

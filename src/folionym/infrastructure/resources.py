@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
+from .errors import DataFileError
+
 DataFileName = Literal[
     "heuristic_scores.json",
     "heuristic_scores_de.json",
@@ -42,7 +44,7 @@ def load_json_data(path: str | Path) -> Any:
     try:
         data: Any = json.loads(text)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON in data file at {path_obj.absolute()}. {exc!s}") from exc
+        raise DataFileError(f"Invalid JSON in data file at {path_obj.absolute()}. {exc!s}") from exc
     return data
 
 
@@ -54,14 +56,6 @@ def _discover_repo_root(start: Path | None = None) -> Path | None:
         if (parent / "pyproject.toml").exists():
             return parent
     return None
-
-
-def project_root(start: Path | None = None) -> Path:
-    """Best-effort editable-run project root, falling back to the current directory."""
-    discovered = _discover_repo_root(start)
-    if discovered is not None:
-        return discovered
-    return Path.cwd()
 
 
 def data_dir() -> Path:

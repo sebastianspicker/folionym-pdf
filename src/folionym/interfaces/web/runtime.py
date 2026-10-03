@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from itertools import islice
 from pathlib import Path
 from threading import Event, Lock, Thread
 from typing import Literal
@@ -47,7 +49,7 @@ class RunRecord:
     started_at: datetime | None = None
     completed_at: datetime | None = None
     stop_event: Event = field(default_factory=Event)
-    events: list[RunEvent] = field(default_factory=list)
+    events: deque[RunEvent] = field(default_factory=lambda: deque(maxlen=256))
 
 
 class RunConflictError(RuntimeError):
@@ -57,8 +59,15 @@ class RunConflictError(RuntimeError):
 class RunRegistry:
     """Own preview plans, apply reports, run state, and cooperative cancellation."""
 
-    def __init__(self) -> None:
-        """Initialize isolated run, plan, and report stores."""
+    def __init__(
+        self, *, max_terminal_runs: int = 32, retention_seconds: float = 3600, event_history: int = 256
+    ) -> None:
+        """Bound completed history while keeping active work and its inputs available."""
+        if max_terminal_runs < 1 or retention_seconds <= 0 or event_history < 1:
+            raise ValueError("Run retention limits must be positive")
+        self._max_terminal_runs = max_terminal_runs
+        self._retention_seconds = retention_seconds
+        self._event_history = event_history
         self._lock = Lock()
         self._runs: dict[str, RunRecord] = {}
         self._plans: dict[str, PreviewPlan] = {}
@@ -68,16 +77,44 @@ class RunRegistry:
         """Return the sole nonterminal operation, when present."""
         return next((run for run in self._runs.values() if run.state not in TERMINAL_STATES), None)
 
-    def _new_run(self, kind: RunKind) -> RunRecord:
+    def _new_run(self, kind: RunKind, *, plan_id: str | None = None) -> RunRecord:
         """Reserve the one active-operation slot."""
         with self._lock:
-            active = self._active_run()
-            if active is not None:
-                raise RunConflictError(f"A {active.kind} run is already active.")
-            run = RunRecord(uuid4().hex, kind)
-            self._runs[run.id] = run
-            self._emit_locked(run, "run.queued", {"kind": kind})
-            return run
+            self._prune_locked()
+            return self._reserve_run_locked(kind, plan_id=plan_id)
+
+    def _reserve_run_locked(self, kind: RunKind, *, plan_id: str | None = None) -> RunRecord:
+        """Reserve a run in the same critical section that validates its plan."""
+        active = self._active_run()
+        if active is not None:
+            raise RunConflictError(f"A {active.kind} run is already active.")
+        run = RunRecord(uuid4().hex, kind, plan_id=plan_id, events=deque(maxlen=self._event_history))
+        self._runs[run.id] = run
+        self._emit_locked(run, "run.queued", {"kind": kind})
+        return run
+
+    def _prune_locked(self) -> None:
+        """Evict aged/excess terminal runs and artifacts no retained run references."""
+        terminal = [run for run in self._runs.values() if run.state in TERMINAL_STATES]
+        now = datetime.now(UTC)
+        excess = max(0, len(terminal) - self._max_terminal_runs)
+        expired = [
+            run
+            for index, run in enumerate(terminal)
+            if index < excess
+            or (run.completed_at is not None and (now - run.completed_at).total_seconds() >= self._retention_seconds)
+        ]
+        for run in expired:
+            self._runs.pop(run.id, None)
+        retained_reports = {run.report_id for run in self._runs.values()}
+        for run in expired:
+            if run.report_id and run.report_id not in retained_reports:
+                self._reports.pop(run.report_id, None)
+        retained_plans = {run.plan_id for run in self._runs.values()}
+        retained_plans.update(report.plan_id for report in self._reports.values())
+        for run in expired:
+            if run.plan_id and run.plan_id not in retained_plans:
+                self._plans.pop(run.plan_id, None)
 
     @staticmethod
     def _snapshot_locked(run: RunRecord) -> dict[str, object]:
@@ -127,6 +164,7 @@ class RunRegistry:
             run.completed_at = datetime.now(UTC)
             event = "run.cancelled" if run.state == "cancelled" else "run.completed"
             self._emit_locked(run, event, self._snapshot_locked(run))
+            self._prune_locked()
 
     def _fail(self, run: RunRecord, error: BaseException) -> None:
         """Finalize a failed operation and preserve a safe user-facing error."""
@@ -137,6 +175,7 @@ class RunRegistry:
             run.message = "The operation could not be completed."
             run.completed_at = datetime.now(UTC)
             self._emit_locked(run, "run.failed", self._snapshot_locked(run))
+            self._prune_locked()
 
     def start_preview(self, source: Path, settings: dict[str, object]) -> str:
         """Validate, persist, and start one structured Preview."""
@@ -148,8 +187,12 @@ class RunRegistry:
             raise ValueError("Source must be a folder or PDF.")
 
         run = self._new_run("preview")
-        config = build_config_from_ui_settings(settings, run.stop_event, dry_run=True)
-        save_ui_settings(settings)
+        try:
+            config = build_config_from_ui_settings(settings, run.stop_event, dry_run=True)
+            save_ui_settings(settings)
+        except Exception as exc:
+            self._fail(run, exc)
+            raise
 
         def worker() -> None:
             """Build and retain the Preview plan on a background thread."""
@@ -174,10 +217,14 @@ class RunRegistry:
 
     def start_apply(self, plan_id: str, revision: int, selected_ids: list[str]) -> str:
         """Start exact reviewed-plan application."""
-        plan = self.get_plan(plan_id)
-        if plan.revision != revision:
-            raise ValueError("The preview plan revision is stale.")
-        run = self._new_run("apply")
+        with self._lock:
+            self._prune_locked()
+            plan = self._plans.get(plan_id)
+            if plan is None:
+                raise KeyError(plan_id)
+            if plan.revision != revision:
+                raise ValueError("The preview plan revision is stale.")
+            run = self._reserve_run_locked("apply", plan_id=plan_id)
 
         def worker() -> None:
             """Apply and retain the reviewed-plan report on a background thread."""
@@ -204,6 +251,7 @@ class RunRegistry:
     def cancel(self, run_id: str) -> dict[str, object]:
         """Request cooperative cancellation and return the updated snapshot."""
         with self._lock:
+            self._prune_locked()
             run = self._runs.get(run_id)
             if run is None:
                 raise KeyError(run_id)
@@ -217,6 +265,7 @@ class RunRegistry:
     def snapshot(self, run_id: str) -> dict[str, object]:
         """Return one immutable HTTP-friendly run snapshot."""
         with self._lock:
+            self._prune_locked()
             run = self._runs.get(run_id)
             if run is None:
                 raise KeyError(run_id)
@@ -225,14 +274,23 @@ class RunRegistry:
     def events_after(self, run_id: str, sequence: int) -> tuple[list[RunEvent], bool]:
         """Return retained events after ``sequence`` and whether the run is terminal."""
         with self._lock:
+            self._prune_locked()
             run = self._runs.get(run_id)
             if run is None:
                 raise KeyError(run_id)
-            return ([event for event in run.events if event.sequence > sequence], run.state in TERMINAL_STATES)
+            terminal = run.state in TERMINAL_STATES
+            if not run.events:
+                return [], terminal
+            first, last = run.events[0].sequence, run.events[-1].sequence
+            if sequence < first - 1 or sequence > last:
+                return [RunEvent(last, "run.snapshot", self._snapshot_locked(run))], terminal
+            start = max(0, sequence - first + 1)
+            return list(islice(run.events, start, None)), terminal
 
     def get_plan(self, plan_id: str) -> PreviewPlan:
         """Return a retained preview plan."""
         with self._lock:
+            self._prune_locked()
             plan = self._plans.get(plan_id)
         if plan is None:
             raise KeyError(plan_id)
@@ -241,6 +299,7 @@ class RunRegistry:
     def get_report(self, report_id: str) -> ApplyReport:
         """Return a retained apply report."""
         with self._lock:
+            self._prune_locked()
             report = self._reports.get(report_id)
         if report is None:
             raise KeyError(report_id)

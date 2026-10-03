@@ -10,6 +10,11 @@ import webbrowser
 from pathlib import Path
 
 
+def default_static_dir() -> Path:
+    """Return the packaged Vite build directory."""
+    return Path(__file__).parents[2] / "web_dist"
+
+
 def _open_browser_when_ready(url: str, host: str, port: int) -> None:
     """Wait briefly for Uvicorn to listen before opening the browser."""
     for _attempt in range(100):
@@ -37,7 +42,7 @@ def main(argv: list[str] | None = None) -> None:
 
     from .app import create_app
 
-    static_dir = Path(__file__).parents[2] / "web_dist"
+    static_dir = default_static_dir()
     if not (static_dir / "index.html").is_file():
         raise SystemExit("Packaged browser assets are missing. Reinstall Folionym with the web extra.")
 

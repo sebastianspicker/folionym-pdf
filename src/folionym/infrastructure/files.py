@@ -10,3 +10,13 @@ def reject_source_symlink(path: Path) -> None:
     """Reject a visible source symlink before extraction or mutation."""
     if path.is_symlink():
         raise OSError(errno.ELOOP, "Source PDF symbolic links are not supported", path)
+
+
+def is_path_within(path: Path, root: Path) -> bool:
+    """Return whether a resolved path is equal to or below a resolved root."""
+    try:
+        resolved = path.resolve()
+        root_resolved = root.resolve()
+        return resolved == root_resolved or resolved.is_relative_to(root_resolved)
+    except OSError, ValueError:
+        return False

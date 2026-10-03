@@ -10,7 +10,7 @@ export { Modal } from "./Modal";
 export { PageLoader } from "./PageLoader";
 export { PrivacyChip } from "./PrivacyChip";
 export { RunOverlay } from "./RunOverlay";
-export { StageSpine } from "./StageSpine";
+export { Stepper } from "./Stepper";
 export { StatusPill } from "./StatusPill";
 export type { StatusPillStatus } from "./StatusPill";
 export { Switch } from "./Switch";

@@ -19,5 +19,10 @@ export function StatusPill({
   status: StatusPillStatus;
   label?: string;
 }) {
-  return <span className={`status status--${status}`}>{label ?? sentenceCase(status)}</span>;
+  return (
+    <span className={`status status--${status}`}>
+      <span aria-hidden="true" className="status__dot" />
+      {label ?? sentenceCase(status)}
+    </span>
+  );
 }

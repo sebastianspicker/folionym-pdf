@@ -11,7 +11,10 @@ from typing import Any
 
 from ..infrastructure.resources import load_json_data
 
-logger = logging.getLogger("folionym.heuristics")
+logger = logging.getLogger(__name__)
+
+# Category labels that carry no classification; compare after lowercasing.
+PLACEHOLDER_CATEGORIES = frozenset({"unknown", "na", "document"})
 
 
 @dataclass(frozen=True)
@@ -475,7 +478,7 @@ class HeuristicScorer:
         Map category to filename segment using optional parent.
         style: specific (as-is), with_parent (parent_category), parent_only (parent).
         """
-        if not category or category in {"unknown", "document", "na", ""}:
+        if not category or category in PLACEHOLDER_CATEGORIES:
             return category
         if style == "specific":
             return category

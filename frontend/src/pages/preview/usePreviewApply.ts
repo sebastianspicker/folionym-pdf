@@ -19,7 +19,7 @@ export function usePreviewApply({ plan, selected, setError }: UsePreviewApplyOpt
       navigate("apply");
     }
   }, []);
-  const { run, error: runError, setError: setRunError } = useRun(runId, onRunComplete);
+  const { run, error: runError, setError: setRunError, retry: retryRun } = useRun(runId, onRunComplete);
 
   const apply = async () => {
     if (!plan) return;
@@ -51,5 +51,6 @@ export function usePreviewApply({ plan, selected, setError }: UsePreviewApplyOpt
     openConfirm: () => setConfirmOpen(true),
     run,
     runError,
+    retryRun,
   };
 }

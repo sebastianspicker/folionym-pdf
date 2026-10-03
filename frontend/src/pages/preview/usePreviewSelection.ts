@@ -1,4 +1,5 @@
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { PAGE_SIZE } from "../../components/Pagination";
 import type { Plan, PreviewItem, PreviewStatus } from "../../types";
 
 function isSelectable(item: PreviewItem): boolean {
@@ -42,10 +43,15 @@ export function usePreviewSelection(
   const [filter, setFilter] = useState<PreviewStatus | "all">("all");
   const [query, setQuery] = useState("");
 
-  const visibleItems = useMemo(() => filterVisibleItems(plan, filter, query), [filter, plan, query]);
+  const [pageState, setPageState] = useState({ page: 0, filter, query });
+  const filteredItems = useMemo(() => filterVisibleItems(plan, filter, query), [filter, plan, query]);
 
-  const selectable = visibleItems.filter(isSelectable);
-  const activeItem = plan?.items.find((item) => item.id === activeId) ?? null;
+  const page = pageState.filter === filter && pageState.query === query
+    ? Math.min(pageState.page, Math.max(0, Math.ceil(filteredItems.length / PAGE_SIZE) - 1)) : 0;
+  const setPage = (page: number) => setPageState({ page, filter, query });
+  const visibleItems = useMemo(() => filteredItems.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filteredItems, page]);
+  const selectable = useMemo(() => visibleItems.filter(isSelectable), [visibleItems]);
+  const activeItem = visibleItems.find((item) => item.id === activeId) ?? visibleItems[0] ?? null;
   const allVisibleSelected = selectable.length > 0 && selectable.every((item) => selected.has(item.id));
 
   const toggle = (id: string) => {
@@ -57,7 +63,10 @@ export function usePreviewSelection(
   };
 
   return {
-    activeId,
+    page,
+    setPage,
+    totalItems: filteredItems.length,
+    activeId: activeItem?.id ?? null,
     activeItem,
     allVisibleSelected,
     filter,

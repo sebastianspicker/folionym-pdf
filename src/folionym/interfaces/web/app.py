@@ -4,22 +4,22 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import secrets
-import string
 from collections.abc import AsyncIterator, Awaitable, Callable
-from datetime import datetime
 from pathlib import Path
+from threading import Event
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
-from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from ...application.models import ApplyReport, PreviewItem, PreviewPlan
-from ...infrastructure.http import validate_http_endpoint
-from ..ui_settings import load_ui_settings, merged_ui_settings
+from ...application.discovery import count_directory_pdfs, list_child_directories, local_filesystem_roots
+from ...application.models import PreviewPlan
+from ...application.privacy import external_llm_endpoint
+from ..ui_settings import build_config_from_ui_settings, load_ui_settings, merged_ui_settings
+from .cli import default_static_dir
+from .payloads import item_payload, plan_payload, report_payload
 from .runtime import RunConflictError, RunEvent, RunRegistry
 from .schema import (
     ApplyRequest,
@@ -29,6 +29,7 @@ from .schema import (
     RunStartedResponse,
     UISettingsPayload,
 )
+from .thumbnails import ThumbnailCache
 
 _SESSION_COOKIE = "folionym_session"
 _ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost"})
@@ -51,17 +52,6 @@ def _host_name(host_header: str) -> str:
     return host_header.rsplit(":", 1)[0].lower()
 
 
-def _directory_pdf_count(path: Path) -> int:
-    """Count visible direct PDF files, tolerating entries that disappear."""
-    try:
-        return sum(
-            entry.is_file() and entry.suffix.lower() == ".pdf" and not entry.name.startswith(".")
-            for entry in path.iterdir()
-        )
-    except OSError:
-        return 0
-
-
 def _resolve_directory(path_value: str) -> Path:
     """Resolve one absolute directory path to a readable filesystem location."""
     path = Path(path_value).expanduser()
@@ -76,31 +66,22 @@ def _resolve_directory(path_value: str) -> Path:
     return resolved
 
 
-def _visible_directories(directory: Path) -> list[Path]:
-    """List non-hidden, non-symlink child directories in a stable order."""
-    try:
-        return sorted(
-            (
-                child
-                for child in directory.iterdir()
-                if child.is_dir() and not child.is_symlink() and not child.name.startswith(".")
-            ),
-            key=lambda child: child.name.casefold(),
-        )
-    except PermissionError as exc:
-        raise HTTPException(403, "Directory is not readable.") from exc
-
-
-def _directory_listing(path_value: str) -> DirectoryListing:
+def _directory_listing(path_value: str, *, include_counts: bool = True) -> DirectoryListing:
     """Build one permission-aware filesystem navigator response."""
     resolved = _resolve_directory(path_value)
-    directories = _visible_directories(resolved)
+    try:
+        directories = list_child_directories(resolved)
+    except PermissionError as exc:
+        raise HTTPException(403, "Directory is not readable.") from exc
     entries = [
-        DirectoryEntry(name=child.name, path=str(child), pdf_count=_directory_pdf_count(child)) for child in directories
+        DirectoryEntry(
+            name=child.name, path=str(child), pdf_count=count_directory_pdfs(child) if include_counts else None
+        )
+        for child in directories
     ]
     parent = str(resolved.parent) if resolved.parent != resolved else None
     return DirectoryListing(
-        path=str(resolved), parent=parent, entries=entries, pdf_count=_directory_pdf_count(resolved)
+        path=str(resolved), parent=parent, entries=entries, pdf_count=count_directory_pdfs(resolved)
     )
 
 
@@ -150,96 +131,15 @@ def _api_request_security_error(request: Request, session_token: str) -> JSONRes
 
 def _roots() -> list[DirectoryEntry]:
     """Return useful local filesystem roots without exposing file contents."""
-    roots: list[Path] = [Path.home()]
-    if os.name == "nt":
-        roots.extend(Path(f"{letter}:\\") for letter in string.ascii_uppercase if Path(f"{letter}:\\").exists())
-    else:
-        roots.append(Path("/"))
-    unique: dict[str, DirectoryEntry] = {}
-    for root in roots:
-        try:
-            resolved = root.resolve(strict=True)
-        except OSError:
-            continue
-        unique[str(resolved)] = DirectoryEntry(
-            name="Home" if resolved == Path.home().resolve() else str(resolved),
-            path=str(resolved),
-            pdf_count=_directory_pdf_count(resolved),
+    home = Path.home().resolve()
+    return [
+        DirectoryEntry(
+            name="Home" if root == home else str(root),
+            path=str(root),
+            pdf_count=count_directory_pdfs(root),
         )
-    return list(unique.values())
-
-
-def _json_metadata(metadata: dict[str, object]) -> dict[str, object]:
-    """Return JSON-compatible metadata without serializing arbitrary objects."""
-    encoded = jsonable_encoder(metadata)
-    return encoded if isinstance(encoded, dict) else {}
-
-
-def _item_payload(item: PreviewItem) -> dict[str, object]:
-    """Serialize one retained preview item for the browser."""
-    try:
-        current = item.source.stat(follow_symlinks=False)
-        size = current.st_size
-        modified = datetime.fromtimestamp(current.st_mtime).astimezone().isoformat()
-    except OSError:
-        size = 0
-        modified = None
-    return {
-        "id": item.id,
-        "current_name": item.source.name,
-        "source_path": str(item.source),
-        "proposed_name": item.proposed_name,
-        "status": item.status.value,
-        "included": item.included,
-        "reason": item.reason,
-        "size": size,
-        "modified_at": modified,
-        "metadata": _json_metadata(item.metadata),
-    }
-
-
-def _plan_payload(plan: PreviewPlan) -> dict[str, object]:
-    """Serialize a preview plan and factual status counts."""
-    items = [_item_payload(item) for item in plan.items]
-    counts = {
-        status: sum(item["status"] == status for item in items) for status in ("ready", "review", "skipped", "failed")
-    }
-    return {
-        "id": plan.id,
-        "revision": plan.revision,
-        "source": str(plan.source),
-        "source_kind": plan.source_kind,
-        "created_at": plan.created_at.isoformat(),
-        "items": items,
-        "counts": {"all": len(items), **counts},
-    }
-
-
-def _report_payload(report: ApplyReport) -> dict[str, object]:
-    """Serialize an exact reviewed-plan apply report."""
-    items = [
-        {
-            "item_id": item.item_id,
-            "source_name": item.source_name,
-            "target_name": item.target_name,
-            "status": item.status.value,
-            "reason": item.reason,
-        }
-        for item in report.items
+        for root in local_filesystem_roots()
     ]
-    counts = {
-        status: sum(item["status"] == status for item in items)
-        for status in ("renamed", "skipped", "unchanged", "failed", "cancelled")
-    }
-    return {
-        "id": report.id,
-        "plan_id": report.plan_id,
-        "source": str(report.source),
-        "started_at": report.started_at.isoformat(),
-        "completed_at": report.completed_at.isoformat(),
-        "items": items,
-        "counts": counts,
-    }
 
 
 def _sse_event(event: RunEvent) -> str:
@@ -271,17 +171,20 @@ async def _event_stream(registry: RunRegistry, run_id: str, last_sequence: int) 
 
 
 def _external_endpoint_requirement(request: PreviewRequest) -> str | None:
-    """Return the normalized external model URL when acknowledgement is required."""
+    """Return the normalized external model URL when acknowledgement is required.
+
+    The decision uses the configuration the Preview will run with, so endpoints
+    from ``FOLIONYM_*`` variables and vision-only runs are covered.
+    """
     settings = request.settings
-    if not settings.use_llm or not settings.llm_url.strip():
-        return None
     try:
-        endpoint = validate_http_endpoint(settings.llm_url)
+        config = build_config_from_ui_settings(settings.model_dump(), Event(), dry_run=True)
+        endpoint = external_llm_endpoint(config)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    if endpoint.is_loopback or settings.acknowledged_external_endpoint == endpoint.url:
+    if endpoint is None or settings.acknowledged_external_endpoint == endpoint:
         return None
-    return endpoint.url
+    return endpoint
 
 
 def _prepare_preview_settings(request: PreviewRequest) -> dict[str, object]:
@@ -378,9 +281,9 @@ def _register_source_routes(app: FastAPI, registry: RunRegistry) -> None:
         }
 
     @app.get("/api/v1/filesystem")
-    def filesystem(path: str) -> DirectoryListing:
+    def filesystem(path: str, include_counts: bool = True) -> DirectoryListing:
         """List one absolute local directory for the folder picker."""
-        return _directory_listing(path)
+        return _directory_listing(path, include_counts=include_counts)
 
     @app.post("/api/v1/previews", response_model=RunStartedResponse, status_code=202)
     def start_preview(payload: PreviewRequest) -> RunStartedResponse:
@@ -432,10 +335,10 @@ def _register_plan_routes(app: FastAPI, registry: RunRegistry) -> None:
     """Register structured plan retrieval, application, and reports."""
 
     @app.get("/api/v1/plans/{plan_id}")
-    def get_plan(plan_id: str) -> dict[str, object]:
+    def get_plan(plan_id: str, include_metadata: bool = True) -> dict[str, object]:
         """Return one retained structured Preview plan."""
         try:
-            return _plan_payload(registry.get_plan(plan_id))
+            return plan_payload(registry.get_plan(plan_id), include_metadata=include_metadata)
         except KeyError as exc:
             raise HTTPException(404, "Preview plan not found.") from exc
 
@@ -456,34 +359,28 @@ def _register_plan_routes(app: FastAPI, registry: RunRegistry) -> None:
     def get_report(report_id: str) -> dict[str, object]:
         """Return one retained exact-apply report."""
         try:
-            return _report_payload(registry.get_report(report_id))
+            return report_payload(registry.get_report(report_id))
         except KeyError as exc:
             raise HTTPException(404, "Apply report not found.") from exc
 
 
-def _render_thumbnail(plan: PreviewPlan, item_id: str) -> bytes:
-    """Render a bounded first-page PNG for one plan-owned PDF."""
-    item = next((candidate for candidate in plan.items if candidate.id == item_id), None)
-    if item is None:
-        raise HTTPException(404, "Preview item not found.")
-    try:
-        import fitz
-
-        with fitz.open(item.source) as document:
-            if document.page_count < 1:
-                raise HTTPException(404, "No page preview is available.")
-            page = document.load_page(0)
-            scale = min(1.5, 900 / max(float(page.rect.width), 1.0))
-            pixmap = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
-            return bytes(pixmap.tobytes("png"))
-    except ImportError as exc:
-        raise HTTPException(503, "PDF thumbnails require the web extra.") from exc
-    except (OSError, RuntimeError, ValueError) as exc:
-        raise HTTPException(404, "No page preview is available.") from exc
-
-
 def _register_media_routes(app: FastAPI, registry: RunRegistry) -> None:
     """Register plan-owned thumbnails and configured artifacts."""
+    thumbnails = ThumbnailCache()
+
+    @app.get("/api/v1/plans/{plan_id}/items/{item_id}")
+    def get_item(plan_id: str, item_id: str) -> dict[str, object]:
+        """Load selected item evidence independently of the lightweight ledger."""
+        try:
+            plan = registry.get_plan(plan_id)
+        except KeyError as exc:
+            raise HTTPException(404, "Preview plan not found.") from exc
+        item = next((item for item in plan.items if item.id == item_id), None)
+        if item is None:
+            raise HTTPException(404, "Preview item not found.")
+        if item.fingerprint is not None and not item.fingerprint.matches(item.source):
+            raise HTTPException(409, "The source changed after Preview. Preview again.")
+        return item_payload(item)
 
     @app.get("/api/v1/plans/{plan_id}/items/{item_id}/thumbnail")
     def thumbnail(plan_id: str, item_id: str) -> Response:
@@ -493,7 +390,7 @@ def _register_media_routes(app: FastAPI, registry: RunRegistry) -> None:
         except KeyError as exc:
             raise HTTPException(404, "Preview plan not found.") from exc
         return Response(
-            _render_thumbnail(plan, item_id),
+            thumbnails.get(plan, item_id),
             media_type="image/png",
             headers={"Cache-Control": "no-store"},
         )
@@ -547,7 +444,7 @@ def create_app(
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     active_registry = registry or RunRegistry()
     active_token = session_token or secrets.token_urlsafe(32)
-    active_static_dir = static_dir or Path(__file__).parents[2] / "web_dist"
+    active_static_dir = static_dir or default_static_dir()
     app.state.registry = active_registry
     app.state.session_token = active_token
     app.state.static_dir = active_static_dir
@@ -558,6 +455,3 @@ def create_app(
     _register_media_routes(app, active_registry)
     _register_static_routes(app, active_static_dir, active_token)
     return app
-
-
-app = create_app()

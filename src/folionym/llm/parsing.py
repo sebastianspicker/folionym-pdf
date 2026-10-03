@@ -7,7 +7,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+
+from ..infrastructure.tokens import encoding_for_model
 
 logger = logging.getLogger(__name__)
 
@@ -411,18 +412,6 @@ def _clean_json_string(value: str) -> str | None:
     return stripped
 
 
-def _replace_prompt_placeholders(template: str, replacements: dict[str, str]) -> str:
-    """
-    Replace placeholders (e.g. %KEY%) in a prompt template with actual values.
-    Use %...% style for all placeholder keys. Unknown placeholders are left as-is.
-    New prompts should use placeholders for variable bits (language, examples, content).
-    """
-    result = template
-    for key, value in replacements.items():
-        result = result.replace(key, value)
-    return result
-
-
 def truncate_for_llm(
     text: str,
     max_chars: int | None,
@@ -439,28 +428,10 @@ def truncate_for_llm(
     return _truncate_by_chars(text, max_chars)
 
 
-def _encoding_for_model(model_hint: str | None) -> Any | None:
-    """Return a tiktoken encoding for the model, when available."""
-    try:
-        import tiktoken
-
-        if model_hint:
-            return tiktoken.encoding_for_model(model_hint)
-        return tiktoken.get_encoding("cl100k_base")
-    except (
-        ImportError,
-        KeyError,
-        RuntimeError,
-        ValueError,
-        LookupError,
-    ):
-        return None
-
-
 def _truncate_by_tokens(text: str, max_tokens: int | None, model_hint: str | None) -> str | None:
     """Truncate text to a token limit and append the truncation suffix."""
     if max_tokens is not None and max_tokens > 0:
-        enc = _encoding_for_model(model_hint)
+        enc = encoding_for_model(model_hint)
         if enc is not None:
             tokens = enc.encode(text)
             if len(tokens) <= max_tokens:

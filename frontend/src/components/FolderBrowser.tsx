@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, errorMessage } from "../api";
+import { errorMessage } from "../api";
+import { directoryListing } from "../lib/directoryCache";
 import { ChevronIcon, FolderIcon } from "../icons";
 import type { Bootstrap, DirectoryListing } from "../types";
 import { Button } from "./Button";
@@ -23,26 +24,32 @@ export function FolderBrowser({
 }) {
   const [listing, setListing] = useState<DirectoryListing | null>(null);
   const [path, setPath] = useState(initialPath || bootstrap.roots[0]?.path || "/");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const pathInputRef = useRef<HTMLInputElement>(null);
   const browseRequestRef = useRef(0);
 
-  const browse = useCallback(async (nextPath: string) => {
+  const browse = useCallback(async (nextPath: string, refresh = false) => {
     const requestId = ++browseRequestRef.current;
     setError("");
+    setLoading(true);
+    setListing(null);
     try {
-      const next = await api.filesystem(nextPath);
+      const next = await directoryListing(nextPath, refresh);
       if (requestId !== browseRequestRef.current) return;
       setListing(next);
       setPath(next.path);
     } catch (requestError: unknown) {
       if (requestId !== browseRequestRef.current) return;
       setError(errorMessage(requestError));
+    } finally {
+      if (requestId === browseRequestRef.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (open) void browse(initialPath || bootstrap.roots[0]?.path || "/");
+    return () => { browseRequestRef.current += 1; };
   }, [open, initialPath, bootstrap.roots, browse]);
 
   const parentPath = listing?.parent ?? null;
@@ -53,7 +60,7 @@ export function FolderBrowser({
         <>
           <span className="modal__summary">{listing ? `${listing.pdf_count} PDFs in this folder` : ""}</span>
           <Button onClick={onClose}>Cancel</Button>
-          <Button disabled={!listing} onClick={() => {
+          <Button disabled={!listing || loading} onClick={() => {
             if (listing) onChoose(listing.path);
           }} variant="primary">
             Choose folder
@@ -70,6 +77,8 @@ export function FolderBrowser({
           aria-label="Folder path"
           onChange={(event) => {
             browseRequestRef.current += 1;
+            setListing(null);
+            setLoading(false);
             setPath(event.target.value);
           }}
           onKeyDown={(event) => {
@@ -81,11 +90,13 @@ export function FolderBrowser({
         <Button onClick={() => {
           void browse(pathInputRef.current?.value ?? path);
         }}>Go</Button>
+        <Button disabled={loading} onClick={() => { void browse(path, true); }}>Refresh</Button>
       </div>
       {error && <ErrorBanner message={error} onDismiss={() => {
         setError("");
       }} />}
-      <div className="folder-list">
+      {loading && <p role="status">Loading folder…</p>}
+      <div className="folder-list" aria-busy={loading}>
         {parentPath ? (
           <button className="folder-row" onClick={() => {
             void browse(parentPath);
@@ -105,7 +116,7 @@ export function FolderBrowser({
             <FolderIcon />
             <span>
               <strong>{entry.name}</strong>
-              <small>{entry.pdf_count} direct PDFs</small>
+              <small>{entry.pdf_count === null ? "Open to count PDFs" : `${entry.pdf_count} direct PDFs`}</small>
             </span>
             <ChevronIcon />
           </button>

@@ -10,9 +10,9 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
-import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit, urlunsplit
@@ -20,8 +20,17 @@ from urllib.parse import urlsplit, urlunsplit
 import requests
 
 from ..infrastructure.http import ValidatedHttpEndpoint, validate_http_endpoint
+from ..settings.environment import (
+    ENV_LLM_MODEL,
+    ENV_LLM_TIMEOUT,
+    ENV_LLM_URL,
+    ENV_REQUIRE_HTTPS,
+    env_bool,
+    env_float,
+    env_str,
+)
 from .models import VisionCompletionOptions
-from .protocol import LLMClient
+from .protocol import LLMClient, PooledLLMClient, SerializedLLMClient
 
 if TYPE_CHECKING:
     from ..settings import RenamerConfig
@@ -38,17 +47,6 @@ _DEFAULT_LLM_TIMEOUT_S = 60.0
 # ---------------------------------------------------------------------------
 
 
-def _config_or_env(value: str | None, env_key: str, default: str) -> str:
-    """Resolve a string from config value, then env var, then built-in default."""
-    s = (value or "").strip() or (os.environ.get(env_key) or "").strip()
-    return s or default
-
-
-def _env_truthy(env_key: str) -> bool:
-    """Return whether an environment variable contains a recognized true value."""
-    return (os.environ.get(env_key, "") or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _validated_llm_endpoint(value: str) -> ValidatedHttpEndpoint:
     """Validate an LLM endpoint without including its value in raised errors."""
     try:
@@ -57,7 +55,7 @@ def _validated_llm_endpoint(value: str) -> ValidatedHttpEndpoint:
         raise ValueError(f"Invalid LLM endpoint URL: {exc}") from exc
 
 
-def _chat_url_from_completions_url(completions_url: str) -> str:
+def chat_completions_url(completions_url: str) -> str:
     """Derive /v1/chat/completions URL from /v1/completions URL."""
     base = (completions_url or "").strip()
     if not base:
@@ -71,6 +69,46 @@ def _chat_url_from_completions_url(completions_url: str) -> str:
     elif not path.endswith("/v1/chat/completions"):
         path += "/v1/chat/completions"
     return urlunsplit((parsed.scheme, parsed.netloc, path, parsed.query, ""))
+
+
+class EndpointProbeError(Exception):
+    """A completions endpoint did not answer a probe with OpenAI-compatible JSON."""
+
+    def __init__(self, url: str, cause: Exception) -> None:
+        super().__init__(str(cause))
+        self.url = url
+
+
+def probe_completions_endpoint(url: str, model: str, *, use_chat_api: bool = False, timeout_s: float = 3.0) -> str:
+    """Send a one-token request to the API family a run would use and return the probed URL.
+
+    Proxies from the environment and redirects are not followed. Raises
+    ``EndpointProbeError`` when the endpoint is unreachable or the answer is not
+    OpenAI-compatible completions JSON.
+    """
+    payload: dict[str, object]
+    if use_chat_api:
+        probe_url = chat_completions_url(url)
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+            "temperature": 0.0,
+        }
+    else:
+        probe_url = url
+        payload = {"model": model, "prompt": "ping", "max_tokens": 1, "temperature": 0.0}
+    try:
+        with requests.Session() as session:
+            session.trust_env = False
+            resp = session.post(probe_url, json=payload, timeout=timeout_s, allow_redirects=False)
+            resp.raise_for_status()
+            data = resp.json()
+        if not isinstance(data, dict) or not isinstance(data.get("choices"), list):
+            raise ValueError("Response is not OpenAI-compatible completions JSON.")
+    except (requests.RequestException, ValueError, json.JSONDecodeError) as exc:
+        raise EndpointProbeError(probe_url, exc) from exc
+    return probe_url
 
 
 def _extract_chat_message_content(data: dict[str, object]) -> str:
@@ -162,7 +200,7 @@ class HttpLLMBackend:
         response_format: dict[str, str] | None,
     ) -> str:
         """Chat /v1/chat/completions path for instruct-tuned models."""
-        chat_url = _chat_url_from_completions_url(self.base_url)
+        chat_url = chat_completions_url(self.base_url)
         payload: dict[str, object] = {
             "model": self.model,
             "messages": [
@@ -223,7 +261,7 @@ class HttpLLMBackend:
     ) -> str:
         """Send image + text prompt to the OpenAI-compatible /v1/chat/completions endpoint."""
         opts = options or VisionCompletionOptions()
-        chat_url = _chat_url_from_completions_url(self.base_url)
+        chat_url = chat_completions_url(self.base_url)
         vision_model = opts.model or self.model
         payload = {
             "model": vision_model,
@@ -299,26 +337,16 @@ def _resolved_timeout(config: RenamerConfig) -> float:
     timeout_s = config.llm.backend.llm_timeout_s
     if timeout_s is not None and timeout_s > 0:
         return float(timeout_s)
-    try:
-        env_timeout = float(os.environ.get("FOLIONYM_LLM_TIMEOUT", "") or 0)
-    except ValueError:
-        return _DEFAULT_LLM_TIMEOUT_S
-    return env_timeout if env_timeout > 0 else _DEFAULT_LLM_TIMEOUT_S
+    env_timeout = env_float(ENV_LLM_TIMEOUT)
+    return env_timeout if env_timeout is not None and env_timeout > 0 else _DEFAULT_LLM_TIMEOUT_S
 
 
 def _create_http_backend(config: RenamerConfig, *, timeout_s: float, use_chat: bool) -> HttpLLMBackend:
     """Create http backend from the resolved configuration."""
-    base_url = _config_or_env(
-        config.llm.backend.llm_base_url,
-        "FOLIONYM_LLM_URL",
-        _DEFAULT_LLM_URL,
-    )
-    model = _config_or_env(
-        config.llm.backend.llm_model,
-        "FOLIONYM_LLM_MODEL",
-        _DEFAULT_LLM_MODEL,
-    )
-    require_https = config.llm.runtime.require_https or _env_truthy("FOLIONYM_REQUIRE_HTTPS")
+    # Configs built without build_config (e.g. RenamerConfig()) still honour the environment here.
+    base_url = (config.llm.backend.llm_base_url or "").strip() or env_str(ENV_LLM_URL) or _DEFAULT_LLM_URL
+    model = (config.llm.backend.llm_model or "").strip() or env_str(ENV_LLM_MODEL) or _DEFAULT_LLM_MODEL
+    require_https = config.llm.runtime.require_https or env_bool(ENV_REQUIRE_HTTPS)
     _warn_if_plaintext_remote(base_url, enforce=require_https)
     return HttpLLMBackend(base_url=base_url, model=model, timeout_s=timeout_s, use_chat=use_chat)
 
@@ -334,3 +362,22 @@ def create_llm_client_from_config(config: RenamerConfig) -> LLMClient:
     """
     timeout_s = _resolved_timeout(config)
     return _create_http_backend(config, timeout_s=timeout_s, use_chat=config.llm.runtime.llm_use_chat_api)
+
+
+def create_run_scoped_llm_client(config: RenamerConfig) -> LLMClient:
+    """Create a cancellation-aware client or bounded pool for one application run."""
+    worker_limit = 1 if config.output.mode.interactive else max(1, config.output.traversal.workers)
+    concurrency = min(max(1, config.llm.runtime.llm_concurrency), worker_limit)
+    stop_event = config.output.hooks.stop_event
+    clients: list[LLMClient] = []
+    try:
+        for _ in range(concurrency):
+            clients.append(create_llm_client_from_config(config))
+    except BaseException:
+        for client in clients:
+            with contextlib.suppress(OSError, RuntimeError):
+                client.close()
+        raise
+    if len(clients) == 1:
+        return SerializedLLMClient(clients[0], stop_event=stop_event)
+    return PooledLLMClient(clients, stop_event=stop_event)

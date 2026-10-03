@@ -72,6 +72,12 @@ def _has_web_frontend(members: list[PurePosixPath]) -> bool:
 def _verify_members(path: Path, names: list[str]) -> None:
     """Reject forbidden paths and require every package data file and py.typed exactly once."""
     members = [PurePosixPath(name) for name in names if not name.endswith("/")]
+    if path.suffix != ".whl":
+        required = {"scripts/check_architecture.py", "scripts/repository_hygiene.py", "scripts/verify_distributions.py"}
+        present = {"/".join(member.parts[1:]) for member in members}
+        missing = required - present
+        if missing:
+            raise AssertionError(f"{path.name}: missing source-distribution checks: {sorted(missing)}")
     for member in members:
         _verify_safe_member(path, member)
     for data_file in DATA_FILES:

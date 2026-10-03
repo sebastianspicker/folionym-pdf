@@ -34,12 +34,9 @@ try:
 except ImportError as _error:  # pragma: no cover
     raise ImportError("textual is required for the TUI. Install with: pip install -e '.[tui]'") from _error
 
-from ...application.hooks import _make_post_rename_success_callback
-from ...application.models import ApplyStatus, PreviewPlan
-from ...application.proposals import suggest_rename_for_file
+from ...application.models import ApplyStatus, PreviewPlan, PreviewStatus
 from ...application.reviewed_plan import apply_reviewed_plan, create_preview_plan
 from ...infrastructure.logging import setup_logging
-from ...rename_ops import apply_single_rename, sanitize_filename_base
 from ...settings import RenamerConfig
 from ..ui_settings import (
     SETTINGS_PATH,
@@ -58,7 +55,6 @@ from .operations import process_single_file
 from .presentation import (
     completion_summary,
     effective_configuration_lines,
-    format_run_log_line,
     format_run_summary,
     metric_summary,
 )
@@ -67,7 +63,7 @@ from .selection import TuiSourceSelection
 from .values import TuiValueAccess
 from .worker_messages import _ApplyFinished, _PlanFailed, _PreviewFinished, _RunFinished, _RunLog, _RunProgress
 
-__all__ = ["SETTINGS_PATH", "FolionymTUI", "_load_settings", "_save_settings", "main"]
+__all__ = ["SETTINGS_PATH", "FolionymTUI", "main"]
 _TUI_WORKER_EXCEPTIONS = (AttributeError, KeyError, OSError, RuntimeError, TypeError, ValueError)
 _MATERIAL_CONTROL_IDS = frozenset(
     {
@@ -209,7 +205,7 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
     def _invalidate_for_control(self, control_id: str | None) -> None:
         if control_id not in _MATERIAL_CONTROL_IDS or self._operation_running or self._reviewed_plan.plan is None:
             return
-        self._reviewed_plan.invalidate("Source or settings changed after Preview.")
+        self._reviewed_plan.clear()
         self._clear_preview_table()
         self._set_apply_guidance("Preview invalidated by a source or settings change. Preview again before Apply.")
         self._set_status("Preview invalidated", "status-idle")
@@ -354,10 +350,11 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
         self._set_run_controls_active(False)
         self._reviewed_plan.retain(message.plan, complete=message.complete)
         self._render_retained_plan(message.plan)
-        ready = sum(item.status.value == "ready" for item in message.plan.items)
-        skipped = sum(item.status.value == "skipped" for item in message.plan.items)
-        failed = sum(item.status.value == "failed" for item in message.plan.items)
-        self._set_counts(renamed=ready, skipped=skipped, failed=failed)
+        self._set_counts(
+            renamed=message.plan.count(PreviewStatus.READY),
+            skipped=message.plan.count(PreviewStatus.SKIPPED),
+            failed=message.plan.count(PreviewStatus.FAILED),
+        )
         log = self.query_one("#run-log", RichLog)
         if message.complete:
             self._set_status("Preview ready. Apply uses these exact reviewed names.", "status-done")
@@ -398,7 +395,7 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
             target = item.target_name or "no target"
             detail = item.reason or item.status.value
             log.write(f"[dim]{_escape_markup(item.source_name)}[/dim] → [b]{_escape_markup(target)}[/b]  {detail}")
-        self._reviewed_plan.invalidate("The reviewed plan was consumed by Apply. Preview again before another Apply.")
+        self._reviewed_plan.clear()
         if cancelled:
             self._set_status("Apply cancelled; completed exact targets are shown below.", "status-cancel")
             self._set_apply_guidance("Apply was partial or cancelled. Preview again before another Apply.")
@@ -429,19 +426,15 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
     @on(_RunLog)
     def on_run_log(self, message: _RunLog) -> None:
         """Present only immediate single-file worker logs; folder rows never use logs."""
-        formatted, count_key = format_run_log_line(message.line)
-        if count_key == "renamed":
-            self._run_counts["renamed"] += 1
-        elif count_key in {"skipped", "failed"}:
-            self._run_counts[count_key] += 1
-        self.query_one("#run-log", RichLog).write(formatted)
-        self._set_counts(**self._run_counts)
+        self.query_one("#run-log", RichLog).write(message.line.rstrip())
 
     @on(_RunFinished)
     def on_run_finished(self, message: _RunFinished) -> None:
         """Finalize the explicit immediate single-file flow."""
         self._operation_running = False
         self._set_run_controls_active(False)
+        self._run_counts[message.outcome] += 1
+        self._set_counts(**self._run_counts)
         if message.ok:
             cancelled = self._stop_event.is_set()
             self._set_status("Cancelled" if cancelled else "Completed", "status-cancel" if cancelled else "status-done")
@@ -566,6 +559,7 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
         if run is None:
             return
         directory, config = run
+        _save_settings(self.snapshot())
         self._reviewed_plan.clear()
         self._clear_preview_table()
         self._set_apply_guidance("Preview is running. Apply remains unavailable until it completes.")
@@ -605,7 +599,7 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
         )
 
     def _start_single_file_ui(self, fp: Path) -> None:
-        self._reviewed_plan.invalidate("A single-file rename was started. Preview again before folder Apply.")
+        self._reviewed_plan.clear()
         self._activate_tab("run")
         log = self.query_one("#run-log", RichLog)
         log.display = True
@@ -623,17 +617,10 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
     @work(thread=True, exclusive=True)
     def _single_file_worker(self, fp: Path, config: RenamerConfig) -> None:
         try:
-            result = process_single_file(
-                fp,
-                config,
-                suggest=suggest_rename_for_file,
-                apply=apply_single_rename,
-                sanitize=sanitize_filename_base,
-                success_callback=_make_post_rename_success_callback,
-            )
+            result = process_single_file(fp, config)
             for line in result.log_lines:
                 self.call_from_thread(self.post_message, _RunLog(line))
-            self.call_from_thread(self.post_message, _RunFinished(result.ok, result.message))
+            self.call_from_thread(self.post_message, _RunFinished(result.ok, result.message, result.outcome))
         except _TUI_WORKER_EXCEPTIONS as exc:
             self.call_from_thread(self.post_message, _RunFinished(False, str(exc)))
 

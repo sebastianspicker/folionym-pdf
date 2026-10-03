@@ -17,21 +17,15 @@ from .models import Proposal
 ProposalFuture = Future[Proposal]
 ProposalFutureMap = dict[ProposalFuture, tuple[int, Path]]
 ProcessOneFileFn = Callable[[Path, RenamerConfig, ProcessingRules | None, LLMClient | None], Proposal]
-StopRequestedFn = Callable[[RenamerConfig], bool]
-ExecutorFactory = Callable[[int], Any]
-WaitFn = Callable[..., tuple[set[ProposalFuture], set[ProposalFuture]]]
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class ProposalProductionDependencies:
-    """Dependencies and exception policy for proposal production."""
+    """Per-file processing function and exception policy for proposal production."""
 
     process_one_file: ProcessOneFileFn
-    stop_requested: StopRequestedFn
     recoverable_exceptions: tuple[type[BaseException], ...]
-    logger: logging.Logger
-    executor_factory: ExecutorFactory = ThreadPoolExecutor
-    wait_for_futures: WaitFn = wait
 
 
 @dataclass(frozen=True)
@@ -69,6 +63,12 @@ class _ProposalContext:
     deps: ProposalProductionDependencies
 
 
+def stop_requested(config: RenamerConfig) -> bool:
+    """Return whether the configured stop event exists and is set."""
+    stop_event = config.output.hooks.stop_event
+    return bool(stop_event is not None and hasattr(stop_event, "is_set") and stop_event.is_set())
+
+
 def produce_proposals_with(
     request: ProposalProductionRequest,
     deps: ProposalProductionDependencies,
@@ -76,7 +76,7 @@ def produce_proposals_with(
     """Produce typed proposals with bounded concurrency and stable input ordering."""
     if request.workers <= 1:
         return _produce_sequential_proposals(request, deps)
-    executor = deps.executor_factory(request.workers)
+    executor = ThreadPoolExecutor(request.workers)
     futures: ProposalFutureMap = {}
     parallel_results: list[Proposal | None] = [None] * len(request.files)
     execution = _ProposalExecution(
@@ -108,13 +108,13 @@ def _run_parallel_proposal_loop(context: _ProposalContext) -> bool:
     completed = 0
     next_index = 0
     while next_index < len(context.files) or context.execution.futures:
-        if context.deps.stop_requested(context.config):
-            context.deps.logger.info("Stop requested. Ending processing early.")
+        if stop_requested(context.config):
+            logger.info("Stop requested. Ending processing early.")
             return True
         next_index = _submit_proposal_futures(context, next_index)
         if not context.execution.futures:
             continue
-        done, _pending = context.deps.wait_for_futures(set(context.execution.futures), return_when=FIRST_COMPLETED)
+        done, _pending = wait(set(context.execution.futures), return_when=FIRST_COMPLETED)
         completed, stop_early = _store_completed_proposal_futures(context, done, completed)
         if stop_early:
             return True
@@ -182,8 +182,8 @@ def _produce_sequential_proposals(
     """Produce proposals on the caller thread, respecting cancellation between files."""
     proposals: list[Proposal] = []
     for path in request.files:
-        if deps.stop_requested(request.config):
-            deps.logger.info("Stop requested. Ending processing early.")
+        if stop_requested(request.config):
+            logger.info("Stop requested. Ending processing early.")
             break
         try:
             proposal = deps.process_one_file(path, request.config, request.rules, request.llm_client)

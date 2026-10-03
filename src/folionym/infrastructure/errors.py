@@ -6,6 +6,11 @@ import json
 
 import requests
 
+
+class DataFileError(ValueError):
+    """A bundled or user-supplied JSON data file could not be parsed."""
+
+
 COMMON_RECOVERABLE_EXCEPTIONS = (
     json.JSONDecodeError,
     KeyError,

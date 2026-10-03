@@ -15,7 +15,7 @@ from .filesystem import (
     _open_exclusive_target,
     _path_matches_identity,
 )
-from .naming import _validate_path_within_parent
+from .options import validate_path_within_parent
 
 _OWNER_ONLY_DIRECTORY_MODE = stat.S_IRWXU
 _OWNER_ONLY_FILE_MODE = stat.S_IRUSR | stat.S_IWUSR
@@ -27,7 +27,7 @@ def _write_backup(file_path: Path, backup_dir: Path | str | None) -> None:
         return
     backup_root = Path(backup_dir)
     backup_path = backup_root / file_path.name
-    _validate_path_within_parent(backup_path, backup_root)
+    validate_path_within_parent(backup_path, backup_root)
     backup_root.mkdir(parents=True, exist_ok=True, mode=_OWNER_ONLY_DIRECTORY_MODE)
     if os.name == "nt":
         _write_backup_by_path(file_path, backup_path)

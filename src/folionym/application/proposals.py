@@ -5,25 +5,29 @@ from __future__ import annotations
 import contextlib
 import logging
 from collections.abc import Callable, Iterator
-from concurrent.futures import CancelledError, ThreadPoolExecutor, wait
+from concurrent.futures import CancelledError
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..extraction.pdf import get_pdf_metadata
-from ..extraction.pipeline import extract_pdf_content as _extract_pdf_content_default
-from ..extraction.pipeline import extract_pdf_content_with
+from ..extraction.pipeline import extract_pdf_content
 from ..infrastructure.errors import COMMON_RECOVERABLE_EXCEPTIONS
-from ..infrastructure.files import reject_source_symlink
-from ..llm.http import create_llm_client_from_config
-from ..llm.protocol import LLMClient, SerializedLLMClient
+from ..infrastructure.filenames import sanitize_filename_base
+from ..llm.http import create_run_scoped_llm_client
+from ..llm.protocol import LLMClient
 from ..naming.models import FilenameGenerationContext, FilenameGenerationDependencies, FilenameGenerationRequest
 from ..naming.rules import ProcessingRules, force_category_for_basename, load_processing_rules
 from ..naming.service import generate_filename
-from ..rename_ops import sanitize_filename_base
 from ..settings import RenamerConfig
 from .models import Proposal
-from .scheduling import ProposalProductionDependencies, ProposalProductionRequest, produce_proposals_with
+from .privacy import run_contacts_model
+from .scheduling import (
+    ProposalProductionDependencies,
+    ProposalProductionRequest,
+    produce_proposals_with,
+    stop_requested,
+)
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_PROPOSAL_EXCEPTIONS = (AttributeError, CancelledError, *COMMON_RECOVERABLE_EXCEPTIONS)
@@ -52,18 +56,7 @@ def _lookup_override_category(file_path: Path, override_map: dict[str, str] | No
     return None
 
 
-def stop_requested(config: RenamerConfig) -> bool:
-    """Return whether the configured stop event exists and is set."""
-    stop_event = config.output.hooks.stop_event
-    return bool(stop_event is not None and hasattr(stop_event, "is_set") and stop_event.is_set())
-
-
-def _run_uses_llm_client(config: RenamerConfig) -> bool:
-    """Return whether this run can make an LLM or vision request."""
-    return bool(config.llm.runtime.use_llm or config.llm.vision.vision_first or config.llm.vision.use_vision_fallback)
-
-
-def _close_llm_client(client: SerializedLLMClient | None) -> None:
+def _close_llm_client(client: LLMClient | None) -> None:
     """Close a run-scoped client while keeping backend cleanup best-effort."""
     if client is None:
         return
@@ -75,9 +68,8 @@ def _close_llm_client(client: SerializedLLMClient | None) -> None:
 
 @contextmanager
 def run_scoped_llm_client(config: RenamerConfig) -> Iterator[LLMClient | None]:
-    """Create at most one serialized LLM client and close it when the run exits."""
-    raw_client = create_llm_client_from_config(config) if _run_uses_llm_client(config) else None
-    client = SerializedLLMClient(raw_client) if raw_client is not None else None
+    """Own one bounded, cancellation-aware client pool for the duration of a run."""
+    client = create_run_scoped_llm_client(config) if run_contacts_model(config) else None
     try:
         yield client
     finally:
@@ -94,21 +86,6 @@ class ContentProcessingRequest:
     rules: ProcessingRules | None = None
     used_vision: bool = False
     llm_client: LLMClient | None = None
-
-
-def _extract_pdf_content(path: Path, config: RenamerConfig) -> tuple[str, bool]:
-    """Extract through the configured default strategy."""
-    return _extract_pdf_content_default(path, config)
-
-
-def _extract_pdf_content_with_client(
-    path: Path, config: RenamerConfig, llm_client: LLMClient | None
-) -> tuple[str, bool]:
-    """Reject source symlinks, then extract with the run-scoped client when supplied."""
-    reject_source_symlink(path)
-    if llm_client is None:
-        return _extract_pdf_content(path, config)
-    return extract_pdf_content_with(path, config, llm_client=llm_client)
 
 
 def process_content_to_proposal(request: ContentProcessingRequest) -> Proposal:
@@ -150,13 +127,13 @@ def process_one_file(
     if stop_requested(config):
         return Proposal(file_path, None, None)
     try:
-        content, used_vision = _extract_pdf_content_with_client(file_path, config, llm_client)
+        extraction = extract_pdf_content(file_path, config, llm_client=llm_client)
     except _RECOVERABLE_PROPOSAL_EXCEPTIONS as exc:
         return Proposal(file_path, None, None, exc)
-    if not content.strip():
+    if not extraction.content.strip():
         return Proposal(file_path, None, None)
     return process_content_to_proposal(
-        ContentProcessingRequest(file_path, content, config, rules, used_vision, llm_client)
+        ContentProcessingRequest(file_path, extraction.content, config, rules, extraction.used_vision, llm_client)
     )
 
 
@@ -190,11 +167,7 @@ def produce_proposals(
                 ProposalProductionRequest(files, config, rules, progress_callback, workers, llm_client),
                 ProposalProductionDependencies(
                     process_one_file=process_one_file,
-                    stop_requested=stop_requested,
                     recoverable_exceptions=_RECOVERABLE_PROPOSAL_EXCEPTIONS,
-                    logger=logger,
-                    executor_factory=ThreadPoolExecutor,
-                    wait_for_futures=wait,
                 ),
             )
     except _RECOVERABLE_PROPOSAL_EXCEPTIONS as exc:

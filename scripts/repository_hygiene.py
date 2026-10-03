@@ -21,6 +21,7 @@ _FORBIDDEN_COMPONENTS = {
     ".kilo",
     ".mypy_cache",
     ".pytest_cache",
+    ".repowise",
     ".ruff_cache",
     ".serena",
     ".windsurf",

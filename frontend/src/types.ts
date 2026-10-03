@@ -29,7 +29,7 @@ export type Settings = Omit<Record<SettingsTextKey, string>, "language" | "case"
 export interface DirectoryEntry {
   name: string;
   path: string;
-  pdf_count: number;
+  pdf_count: number | null;
 }
 
 export interface DirectoryListing {

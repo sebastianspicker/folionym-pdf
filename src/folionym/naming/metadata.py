@@ -3,36 +3,28 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from ..llm import get_document_category
-from ..llm.models import CategoryOptions
 from ..llm.protocol import LLMClient
 from ..settings import RenamerConfig
+from .analysis import request_document_metadata, request_llm_category, resolve_final_summary_tokens
 from .heuristics import (
     CategoryCombineOptions,
     CategoryCombineParams,
-    HeuristicScorer,
     combine_categories,
     normalize_llm_category,
 )
-from .llm_metadata import (
-    _FinalSummaryTokenInput,
-    _get_llm_summary_and_keywords,
-    _resolve_final_summary_tokens,
-    _suggested_categories_for_llm,
-)
 from .models import (
-    _CategoryContext,
-    _CategoryResolutionInput,
-    _FilenameCacheContext,
-    _HeuristicCategorySignal,
-    _LlmResult,
-    _LlmSummaryInput,
-    _MetadataResolutionInput,
+    CategoryResolutionInput,
+    FilenameMetadataParts,
+    FinalSummaryTokenInput,
+    HeuristicCategorySignal,
+    LlmMetadataResult,
+    LlmSummaryInput,
+    MetadataResolutionInput,
 )
 from .rules import ProcessingRules
-from .scoring import ConfidenceOptions, TopNOptions
+from .scoring import PLACEHOLDER_CATEGORIES, ConfidenceOptions, HeuristicScorer, TopNOptions
 from .tokens import Stopwords, clean_token, normalize_keywords, split_to_tokens, subtract_tokens
 
 logger = logging.getLogger(__name__)
@@ -49,6 +41,17 @@ class _MetadataRuntime:
     heuristic_scorer: HeuristicScorer
 
 
+@dataclass(frozen=True)
+class _CategoryContext:
+    """Current category decision and its heuristic provenance."""
+
+    category: str
+    category_for_filename: str
+    category_source: str
+    heuristic: HeuristicCategorySignal
+    skip_llm_by_rule: bool
+
+
 def _heuristic_text_for_category(pdf_content: str, config: RenamerConfig) -> str:
     """Return the slice of PDF content used for heuristic category scoring."""
     window = config.heuristic.window
@@ -63,10 +66,10 @@ def _resolve_heuristic_category(
     heuristic_text: str,
     config: RenamerConfig,
     heuristic_scorer: HeuristicScorer,
-) -> tuple[str, float, str, float, float, str | None]:
-    """Run heuristic scoring; return (cat_heur, score, runner_up_cat, runner_up_score, gap, suggested_doc_type)."""
+) -> HeuristicCategorySignal:
+    """Run heuristic scoring and derive the confidence gap and suggested document type."""
     scoring = config.heuristic.scoring
-    cat_heur, heuristic_score, runner_up_cat, runner_up_score = heuristic_scorer.best_category_with_confidence(
+    cat_heur, heuristic_score, _runner_up_cat, runner_up_score = heuristic_scorer.best_category_with_confidence(
         heuristic_text,
         ConfidenceOptions(
             language=config.output.naming.language,
@@ -82,13 +85,12 @@ def _resolve_heuristic_category(
     suggested_doc_type = (
         cat_heur if (cat_heur != "unknown" and heuristic_score >= _HEURISTIC_SUGGESTED_DOC_TYPE_MIN_SCORE) else None
     )
-    return (
-        cat_heur,
-        heuristic_score,
-        runner_up_cat,
-        runner_up_score,
-        heuristic_gap,
-        suggested_doc_type,
+    return HeuristicCategorySignal(
+        heuristic_text=heuristic_text,
+        cat_heur=cat_heur,
+        heuristic_score=heuristic_score,
+        heuristic_gap=heuristic_gap,
+        suggested_doc_type=suggested_doc_type,
     )
 
 
@@ -111,14 +113,14 @@ def _validate_llm_category_against_allowed(cat_llm: str, allowed: list[str] | No
         return cat_llm
     norm = normalize_llm_category(cat_llm).strip().lower().replace(" ", "_")
     allowed_set = frozenset(c.strip().lower().replace(" ", "_") for c in allowed)
-    if norm and norm not in allowed_set and norm not in {"unknown", "na", "document"}:
+    if norm and norm not in allowed_set and norm not in PLACEHOLDER_CATEGORIES:
         logger.info("LLM category %r not in allowed set; using heuristic.", cat_llm)
         return "unknown"
     return cat_llm
 
 
 def _should_skip_llm_category(
-    request: _CategoryResolutionInput,
+    heuristic: HeuristicCategorySignal,
     config: RenamerConfig,
 ) -> bool:
     """Return whether strong heuristic evidence permits skipping LLM classification."""
@@ -126,45 +128,29 @@ def _should_skip_llm_category(
     return bool(
         skip.skip_llm_category_if_heuristic_score_ge is not None
         and skip.skip_llm_category_if_heuristic_gap_ge is not None
-        and request.cat_heur != "unknown"
-        and request.heuristic_score >= skip.skip_llm_category_if_heuristic_score_ge
-        and request.heuristic_gap >= skip.skip_llm_category_if_heuristic_gap_ge
+        and heuristic.cat_heur != "unknown"
+        and heuristic.heuristic_score >= skip.skip_llm_category_if_heuristic_score_ge
+        and heuristic.heuristic_gap >= skip.skip_llm_category_if_heuristic_gap_ge
     )
 
 
 def _resolve_llm_category_candidate(
-    request: _CategoryResolutionInput,
+    request: CategoryResolutionInput,
     runtime: _MetadataRuntime,
     *,
     skip_llm: bool,
 ) -> str:
     """Choose a heuristic, precomputed, or newly requested LLM category."""
-    config = runtime.config
-    heuristic_scorer = runtime.heuristic_scorer
-    allowed = _resolve_allowed_categories(config, heuristic_scorer, request.rules)
+    allowed = _resolve_allowed_categories(runtime.config, runtime.heuristic_scorer, request.rules)
     if skip_llm:
-        return request.cat_heur
+        return request.heuristic.cat_heur
     if request.precomputed_llm_category is not None:
         return _validate_llm_category_against_allowed(request.precomputed_llm_category, allowed)
-    cat_llm = get_document_category(
-        runtime.llm_client,
-        summary=request.summary,
-        keywords=request.keywords,
-        options=CategoryOptions(
-            language=config.output.naming.language,
-            suggested_categories=(
-                _suggested_categories_for_llm(request.heuristic_text, config, heuristic_scorer) if not allowed else None
-            ),
-            allowed_categories=allowed,
-            lenient_json=config.llm.runtime.lenient_llm_json,
-            cache=request.response_cache,
-            cache_key_base=request.cache_key_base,
-        ),
-    )
+    cat_llm = request_llm_category(request, runtime.config, runtime.llm_client, runtime.heuristic_scorer, allowed)
     return _validate_llm_category_against_allowed(cat_llm, allowed)
 
 
-def _category_overlap_context(request: _CategoryResolutionInput, config: RenamerConfig) -> str | None:
+def _category_overlap_context(request: CategoryResolutionInput, config: RenamerConfig) -> str | None:
     """Build summary-and-keyword context for category overlap scoring."""
     if not config.heuristic.category.use_keyword_overlap_for_category:
         return None
@@ -196,7 +182,7 @@ def _category_source(skip_llm: bool, cat_heur: str) -> str:
 
 
 def _log_category_resolution(
-    request: _CategoryResolutionInput,
+    heuristic: HeuristicCategorySignal,
     config: RenamerConfig,
     *,
     category_source: str,
@@ -207,7 +193,7 @@ def _log_category_resolution(
     logger.info(
         "CategorySource source=%s heuristic=%s llm=%s category=%s",
         category_source,
-        request.cat_heur,
+        heuristic.cat_heur,
         cat_llm,
         category,
     )
@@ -215,60 +201,64 @@ def _log_category_resolution(
         logger.info(
             "Explain ConflictResolution source=%s heuristic=%s heuristic_score=%.2f heuristic_gap=%.2f llm=%s final=%s",
             category_source,
-            request.cat_heur,
-            request.heuristic_score,
-            request.heuristic_gap,
+            heuristic.cat_heur,
+            heuristic.heuristic_score,
+            heuristic.heuristic_gap,
             cat_llm,
             category,
         )
 
 
 def _resolve_category_with_llm(
-    request: _CategoryResolutionInput,
-    config: RenamerConfig,
-    heuristic_scorer: HeuristicScorer,
-    llm_client: LLMClient,
-) -> tuple[str, str, str]:
-    """Resolve final category (heuristic + optional LLM, combine_categories).
-    Returns (category, category_for_filename, category_source)."""
-    cat_heur = request.cat_heur
+    context: _CategoryContext,
+    request: CategoryResolutionInput,
+    runtime: _MetadataRuntime,
+) -> _CategoryContext:
+    """Resolve the final category from the heuristic candidate and an optional LLM category."""
+    config = runtime.config
+    heuristic_scorer = runtime.heuristic_scorer
+    heuristic = request.heuristic
+    cat_heur = heuristic.cat_heur
+    display = config.heuristic.category.category_display
     if not config.llm.runtime.use_llm:
-        category_for_filename = heuristic_scorer.get_display_category(
-            cat_heur, config.heuristic.category.category_display
-        )
         logger.info("CategorySource source=heuristic category=%s (use_llm=False)", cat_heur)
-        return (cat_heur, category_for_filename, "heuristic")
+        return replace(
+            context,
+            category=cat_heur,
+            category_for_filename=heuristic_scorer.get_display_category(cat_heur, display),
+            category_source="heuristic",
+        )
 
-    skip_llm = _should_skip_llm_category(request, config)
-    cat_llm = _resolve_llm_category_candidate(
-        request,
-        _MetadataRuntime(config, llm_client, heuristic_scorer),
-        skip_llm=skip_llm,
-    )
+    skip_llm = _should_skip_llm_category(heuristic, config)
+    cat_llm = _resolve_llm_category_candidate(request, runtime, skip_llm=skip_llm)
     category = combine_categories(
         cat_llm,
         cat_heur,
         CategoryCombineOptions(
-            heuristic_score=request.heuristic_score if cat_heur != "unknown" else None,
-            heuristic_gap=request.heuristic_gap if cat_heur != "unknown" else None,
+            heuristic_score=heuristic.heuristic_score if cat_heur != "unknown" else None,
+            heuristic_gap=heuristic.heuristic_gap if cat_heur != "unknown" else None,
             params=_category_combine_params(config),
             context_for_overlap=_category_overlap_context(request, config),
             category_parent_map=heuristic_scorer.category_parent_map(),
         ),
     )
-    category_for_filename = heuristic_scorer.get_display_category(category, config.heuristic.category.category_display)
     category_source = _category_source(skip_llm, cat_heur)
-    _log_category_resolution(request, config, category_source=category_source, cat_llm=cat_llm, category=category)
-    return (category, category_for_filename, category_source)
+    _log_category_resolution(heuristic, config, category_source=category_source, cat_llm=cat_llm, category=category)
+    return replace(
+        context,
+        category=category,
+        category_for_filename=heuristic_scorer.get_display_category(category, display),
+        category_source=category_source,
+    )
 
 
-def _build_metadata_tokens(
+def _build_metadata_parts(
     category_for_filename: str,
     keywords: list[str],
     final_summary_tokens: list[str],
     stopwords: Stopwords,
-) -> tuple[list[str], list[str], list[str], dict[str, object]]:
-    """Filter, clean, subtract tokens; return (category_clean, keyword_clean, summary_clean, metadata)."""
+) -> FilenameMetadataParts:
+    """Filter, clean, and subtract tokens into the filename metadata parts."""
     category_tokens = stopwords.filter_tokens(split_to_tokens(category_for_filename))
     keyword_tokens = stopwords.filter_tokens(keywords)[:3]
     summary_tokens = stopwords.filter_tokens(final_summary_tokens)[:5]
@@ -285,7 +275,7 @@ def _build_metadata_tokens(
         "summary": " ".join(summary_clean),
         "keywords": " ".join(keyword_clean),
     }
-    return (category_clean, keyword_clean, summary_clean, metadata)
+    return FilenameMetadataParts(category_for_filename, category_clean, keyword_clean, summary_clean, metadata)
 
 
 def _override_category_context(
@@ -302,7 +292,7 @@ def _override_category_context(
             config.heuristic.category.category_display,
         ),
         category_source="override",
-        heuristic=_HeuristicCategorySignal(
+        heuristic=HeuristicCategorySignal(
             heuristic_text="",
             cat_heur=override_category,
             heuristic_score=0.0,
@@ -314,22 +304,20 @@ def _override_category_context(
 
 
 def _heuristic_category_context(
-    request: _MetadataResolutionInput,
+    request: MetadataResolutionInput,
     config: RenamerConfig,
     heuristic_scorer: HeuristicScorer,
 ) -> _CategoryContext:
     """Score the document heuristically and build initial category context."""
     heuristic_text = _heuristic_text_for_category(request.pdf_content, config)
-    cat_heur, heuristic_score, _runner_up_cat, _runner_up_score, heuristic_gap, suggested_doc_type = (
-        _resolve_heuristic_category(heuristic_text, config, heuristic_scorer)
-    )
+    heuristic = _resolve_heuristic_category(heuristic_text, config, heuristic_scorer)
     if config.output.progress_options.explain:
         scoring = config.heuristic.scoring
         logger.info(
             "Explain Heuristic category=%s score=%.2f gap=%.2f top=%s",
-            cat_heur,
-            heuristic_score,
-            heuristic_gap,
+            heuristic.cat_heur,
+            heuristic.heuristic_score,
+            heuristic.heuristic_gap,
             heuristic_scorer.top_n_categories(
                 heuristic_text,
                 TopNOptions(
@@ -342,19 +330,13 @@ def _heuristic_category_context(
             ),
         )
     return _CategoryContext(
-        category=cat_heur,
+        category=heuristic.cat_heur,
         category_for_filename=heuristic_scorer.get_display_category(
-            cat_heur, config.heuristic.category.category_display
+            heuristic.cat_heur, config.heuristic.category.category_display
         ),
         category_source="heuristic",
-        heuristic=_HeuristicCategorySignal(
-            heuristic_text=heuristic_text,
-            cat_heur=cat_heur,
-            heuristic_score=heuristic_score,
-            heuristic_gap=heuristic_gap,
-            suggested_doc_type=suggested_doc_type,
-        ),
-        skip_llm_by_rule=_skip_llm_by_rule(config, request.rules, cat_heur),
+        heuristic=heuristic,
+        skip_llm_by_rule=_skip_llm_by_rule(config, request.rules, heuristic.cat_heur),
     )
 
 
@@ -368,7 +350,7 @@ def _skip_llm_by_rule(
 
 
 def _initial_category_context(
-    request: _MetadataResolutionInput,
+    request: MetadataResolutionInput,
     config: RenamerConfig,
     heuristic_scorer: HeuristicScorer,
 ) -> _CategoryContext:
@@ -380,92 +362,79 @@ def _initial_category_context(
 
 def _resolve_summary_and_keywords(
     context: _CategoryContext,
-    request: _MetadataResolutionInput,
-    config: RenamerConfig,
-    llm_client: LLMClient,
-    heuristic_scorer: HeuristicScorer,
-) -> _LlmResult:
+    request: MetadataResolutionInput,
+    runtime: _MetadataRuntime,
+) -> LlmMetadataResult:
     """Return empty metadata when LLM use is skipped; otherwise call the LLM."""
     if context.skip_llm_by_rule:
         logger.info("CategorySource source=heuristic (rules skip_llm) category=%s", context.category)
-        return _LlmResult("", [])
-    if not config.llm.runtime.use_llm:
-        return _LlmResult("", [])
-    return _LlmResult(
-        *_get_llm_summary_and_keywords(
-            _LlmSummaryInput(
-                pdf_content=request.pdf_content,
-                heuristic=context.heuristic,
-                override_category=request.override_category,
-                rules=request.rules,
-                cache_context=_FilenameCacheContext(request.response_cache, request.cache_key_base),
-            ),
-            config,
-            llm_client,
-            heuristic_scorer,
-        )
+        return LlmMetadataResult("", [])
+    if not runtime.config.llm.runtime.use_llm:
+        return LlmMetadataResult("", [])
+    return request_document_metadata(
+        LlmSummaryInput(
+            pdf_content=request.pdf_content,
+            heuristic=context.heuristic,
+            override_category=request.override_category,
+            rules=request.rules,
+            cache=request.cache,
+        ),
+        runtime.config,
+        runtime.llm_client,
+        runtime.heuristic_scorer,
     )
 
 
 def _resolve_final_category_context(
     context: _CategoryContext,
-    request: _MetadataResolutionInput,
-    result: _LlmResult,
+    request: MetadataResolutionInput,
+    result: LlmMetadataResult,
     keywords: list[str],
     runtime: _MetadataRuntime,
 ) -> _CategoryContext:
     """Reconcile the initial category with available LLM metadata."""
     if context.skip_llm_by_rule or request.override_category is not None:
         return context
-    category, category_for_filename, category_source = _resolve_category_with_llm(
-        _CategoryResolutionInput(
+    return _resolve_category_with_llm(
+        context,
+        CategoryResolutionInput(
             heuristic=context.heuristic,
             summary=result.summary,
             keywords=keywords,
             rules=request.rules,
             precomputed_llm_category=result.precomputed_category,
-            cache_context=_FilenameCacheContext(request.response_cache, request.cache_key_base),
+            cache=request.cache,
         ),
-        runtime.config,
-        runtime.heuristic_scorer,
-        runtime.llm_client,
-    )
-    return _CategoryContext(
-        category=category,
-        category_for_filename=category_for_filename,
-        category_source=category_source,
-        heuristic=context.heuristic,
-        skip_llm_by_rule=context.skip_llm_by_rule,
+        runtime,
     )
 
 
 def _final_summary_tokens_for_context(
     context: _CategoryContext,
-    request: _MetadataResolutionInput,
-    result: _LlmResult,
+    request: MetadataResolutionInput,
+    result: LlmMetadataResult,
     keywords: list[str],
     runtime: _MetadataRuntime,
 ) -> list[str]:
     """Resolve final summary tokens unless LLM processing was skipped."""
     if not runtime.config.llm.runtime.use_llm or context.skip_llm_by_rule:
         return []
-    return _resolve_final_summary_tokens(
+    return resolve_final_summary_tokens(
         runtime.config,
         runtime.llm_client,
-        _FinalSummaryTokenInput(
+        FinalSummaryTokenInput(
             summary=result.summary,
             keywords=keywords,
             category=context.category,
             precomputed_summary_tokens=result.precomputed_summary_tokens,
-            response_cache=request.response_cache,
-            cache_key_base=request.cache_key_base,
+            cache=request.cache,
         ),
     )
 
 
-def _log_llm_metadata_result(
+def _log_llm_result(
     context: _CategoryContext,
-    result: _LlmResult,
+    result: LlmMetadataResult,
     keywords: list[str],
     config: RenamerConfig,
 ) -> None:
@@ -482,40 +451,33 @@ def _log_llm_metadata_result(
 
 def _llm_failed_for_context(context: _CategoryContext, config: RenamerConfig) -> bool:
     """Flag an unknown category after an attempted LLM resolution."""
-    category_unknown = (context.category or "").strip().lower() in ("unknown", "na", "document", "")
+    category = (context.category or "").strip().lower()
+    category_unknown = not category or category in PLACEHOLDER_CATEGORIES
     llm_failed = bool(config.llm.runtime.use_llm and not context.skip_llm_by_rule and category_unknown)
     if llm_failed:
         logger.warning("LLM was used but category is unknown; using heuristic or timestamp fallback.")
     return llm_failed
 
 
-def _get_category_summary_keywords_metadata(
-    request: _MetadataResolutionInput,
+def resolve_filename_metadata(
+    request: MetadataResolutionInput,
     config: RenamerConfig,
     llm_client: LLMClient,
     heuristic_scorer: HeuristicScorer,
     stopwords: Stopwords,
-) -> tuple[str, list[str], list[str], list[str], dict[str, object]]:
+) -> FilenameMetadataParts:
     """Resolve category (override/heuristic/LLM), run LLM summary/keywords, clean tokens, build metadata."""
     runtime = _MetadataRuntime(config, llm_client, heuristic_scorer)
     context = _initial_category_context(request, config, heuristic_scorer)
-    result = _resolve_summary_and_keywords(context, request, config, llm_client, heuristic_scorer)
+    result = _resolve_summary_and_keywords(context, request, runtime)
     keywords = normalize_keywords(result.raw_keywords)
-    _log_llm_metadata_result(context, result, keywords, config)
+    _log_llm_result(context, result, keywords, config)
 
     context = _resolve_final_category_context(context, request, result, keywords, runtime)
     llm_failed = _llm_failed_for_context(context, config)
     final_summary_tokens = _final_summary_tokens_for_context(context, request, result, keywords, runtime)
 
-    category_clean, keyword_clean, summary_clean, metadata = _build_metadata_tokens(
-        context.category_for_filename, keywords, final_summary_tokens, stopwords
-    )
-    metadata["category_source"] = context.category_source
-    metadata["llm_failed"] = llm_failed
-    return (
-        context.category_for_filename,
-        category_clean,
-        keyword_clean,
-        summary_clean,
-        metadata,
-    )
+    parts = _build_metadata_parts(context.category_for_filename, keywords, final_summary_tokens, stopwords)
+    parts.metadata["category_source"] = context.category_source
+    parts.metadata["llm_failed"] = llm_failed
+    return parts

@@ -1,5 +1,8 @@
+import { type RefObject } from "react";
 import { Button, Checkbox, ErrorBanner, StatusPill } from "../../components";
+import { Pagination } from "../../components/Pagination";
 import { SearchIcon } from "../../icons";
+import { changedFilenameSegments } from "../../lib/filenameDiff";
 import type { Plan, PreviewItem, PreviewStatus } from "../../types";
 
 function filterLabel(status: PreviewStatus): string {
@@ -17,6 +20,9 @@ function filterLabel(status: PreviewStatus): string {
 
 type LedgerProps = {
   plan: Plan;
+  page: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
   visibleItems: PreviewItem[];
   selected: Set<string>;
   activeId: string | null;
@@ -30,9 +36,13 @@ type LedgerProps = {
   onClear: () => void;
   onActivate: (id: string) => void;
   onDismissError: () => void;
+  searchRef?: RefObject<HTMLInputElement | null>;
 };
 
 export function Ledger({
+  page,
+  totalItems,
+  onPageChange,
   visibleItems,
   selected,
   activeId,
@@ -46,6 +56,7 @@ export function Ledger({
   onClear,
   onActivate,
   onDismissError,
+  searchRef,
 }: LedgerProps) {
   return (
     <section className="ledger-panel" id="ledger">
@@ -54,7 +65,8 @@ export function Ledger({
           <p className="kicker">Preview · immutable plan once applied</p>
           <h1>Rename ledger</h1>
           <p className="lede">
-            Compare source to proposed name. Checked rows keep their exact target on Apply.
+            Compare source to proposed name. Checked rows keep their exact
+            target on Apply.
           </p>
         </div>
         <div className="ledger-tools">
@@ -68,9 +80,11 @@ export function Ledger({
                 onQueryChange(event.target.value);
               }}
               placeholder="Filter by name…"
+              ref={searchRef}
               type="search"
               value={query}
             />
+            <kbd aria-hidden="true">/</kbd>
           </label>
           <div className="tool-cluster">
             <Button
@@ -78,9 +92,13 @@ export function Ledger({
               onClick={onSelectVisible}
               type="button"
             >
-              Select visible
+              Select page
             </Button>
-            <Button disabled={selected.size === 0} onClick={onClear} type="button">
+            <Button
+              disabled={selected.size === 0}
+              onClick={onClear}
+              type="button"
+            >
               Clear
             </Button>
           </div>
@@ -104,14 +122,20 @@ export function Ledger({
         id="ledger-list"
         role="listbox"
       >
-        {visibleItems.map((item) => {
-          const isSelectable = item.status === "ready" || item.status === "review";
+        {visibleItems.map((item, index) => {
+          const isSelectable =
+            item.status === "ready" || item.status === "review";
           const isSelected = selected.has(item.id);
           const isActive = activeId === item.id;
-          const mutedTarget = !item.proposed_name || item.status === "skipped" || item.status === "failed";
+          const mutedTarget =
+            !item.proposed_name ||
+            item.status === "skipped" ||
+            item.status === "failed";
           return (
             <article
               aria-selected={isSelected}
+              aria-posinset={page * 50 + index + 1}
+              aria-setsize={totalItems}
               className={`row ${isSelected ? "is-selected" : ""} ${isActive ? "is-active" : ""}`}
               data-id={item.id}
               data-status={item.status}
@@ -120,6 +144,17 @@ export function Ledger({
                 onActivate(item.id);
               }}
               onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                const destination = event.key === "ArrowDown" ? Math.min(index + 1, visibleItems.length - 1)
+                  : event.key === "ArrowUp" ? Math.max(0, index - 1)
+                  : event.key === "Home" ? 0
+                  : event.key === "End" ? visibleItems.length - 1 : null;
+                if (destination !== null) {
+                  event.preventDefault();
+                  onActivate(visibleItems[destination].id);
+                  event.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role="option"]')[destination]?.focus();
+                  return;
+                }
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   onActivate(item.id);
@@ -128,9 +163,12 @@ export function Ledger({
               role="option"
               tabIndex={isActive ? 0 : -1}
             >
-              <label className="row-check" onClick={(event) => {
-                event.stopPropagation();
-              }}>
+              <label
+                className="row-check"
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+              >
                 <Checkbox
                   aria-label={`Include ${item.proposed_name ?? item.current_name}`}
                   checked={isSelected}
@@ -152,15 +190,31 @@ export function Ledger({
                   className={`name name--to ${mutedTarget ? "name--muted" : ""}`}
                   title={item.proposed_name ?? ""}
                 >
-                  {item.proposed_name ??
-                    (item.status === "skipped"
+                  {item.proposed_name
+                    ? changedFilenameSegments(
+                        item.current_name,
+                        item.proposed_name,
+                      ).map((segment, index) => (
+                        <span
+                          className={
+                            segment.changed ? "name__changed" : undefined
+                          }
+                          key={`${segment.text}-${index}`}
+                        >
+                          {segment.text}
+                        </span>
+                      ))
+                    : item.status === "skipped"
                       ? "Unchanged · already named"
                       : item.status === "failed"
                         ? "No proposal · extract failed"
-                        : "No proposal")}
+                        : "No proposal"}
                 </code>
               </div>
-              <StatusPill label={filterLabel(item.status)} status={item.status} />
+              <StatusPill
+                label={filterLabel(item.status)}
+                status={item.status}
+              />
             </article>
           );
         })}
@@ -172,6 +226,7 @@ export function Ledger({
           </div>
         )}
       </div>
+      <Pagination page={page} total={totalItems} onChange={onPageChange} />
     </section>
   );
 }

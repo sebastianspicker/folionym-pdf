@@ -73,6 +73,7 @@ path = "src/folionym/__init__.py"
 [tool.hatch.build.targets.sdist]
 # Build isolation may omit `.git`, so VCS ignores are not a safe release boundary.
 include = [
+  "/.python-version",
   "/CHANGELOG.md",
   "/CONTRIBUTING.md",
   "/DESIGN.md",
@@ -85,23 +86,27 @@ include = [
   "/docs/README.md",
   "/docs/decisions",
   "/docs/frontend.md",
+  "/docs/performance.md",
   "/docs/releases",
   "/docs/tui.md",
   "/frontend",
   "/pyproject.toml",
+  "/scripts/check_architecture.py",
   "/scripts/repository_hygiene.py",
   "/scripts/verify_distributions.py",
   "/src/folionym",
   "/tests",
   "/uv.lock",
 ]
+# Untracked local tool data and dependencies must never ship, even without VCS ignores.
+exclude = ["**/.repowise", "**/node_modules"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/folionym"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --import-mode=importlib"
 pythonpath = ["src"]
 
 [tool.bandit]

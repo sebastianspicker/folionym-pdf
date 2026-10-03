@@ -1,5 +1,5 @@
 """
-Load stopwords and heuristic scorer from data files. Used by renamer and filename.
+Load stopwords and heuristic scorer from packaged or overridden data files for filename generation.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from ..infrastructure.resources import data_path, load_json_data
-from .heuristics import HeuristicScorer, load_heuristic_rules_for_language
+from .scoring import HeuristicScorer, load_heuristic_rules_for_language
 from .tokens import Stopwords
 
 
@@ -39,9 +39,6 @@ def _stopwords_cached(path_str: str, _mtime: float = 0.0) -> Stopwords:
     return load_meta_stopwords(Path(path_str))
 
 
-stopwords_cached = _stopwords_cached
-
-
 def default_stopwords() -> Stopwords:
     """Return stopwords from the packaged default data file."""
     path_str = str(data_path("meta_stopwords.json"))
@@ -55,10 +52,7 @@ def _heuristic_scorer_cached(path_str: str, language: str, _mtime: float = 0.0) 
     return HeuristicScorer(rules)
 
 
-heuristic_scorer_cached = _heuristic_scorer_cached
-
-
-def default_heuristic_scorer(language: str = "de") -> HeuristicScorer:
+def default_heuristic_scorer(language: str) -> HeuristicScorer:
     """Return a scorer using packaged heuristic rules for the language."""
     path_str = str(data_path("heuristic_scores.json"))
     return _heuristic_scorer_cached(path_str, language, _file_mtime(path_str))

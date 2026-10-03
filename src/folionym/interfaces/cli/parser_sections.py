@@ -283,6 +283,7 @@ def add_file_side_effect_args(p: argparse._ActionsContainer) -> None:
 
 def add_runtime_control_args(p: argparse._ActionsContainer) -> None:
     """Register runtime control command-line flags on the shared parser."""
+    _add_resource_limit_args(p)
     p.add_argument(
         "--workers",
         dest="workers",
@@ -325,4 +326,29 @@ def add_runtime_control_args(p: argparse._ActionsContainer) -> None:
             "May include sensitive raw LLM outputs, document excerpts, summaries, or keywords in the "
             "configured log sink."
         ),
+    )
+
+
+def _add_resource_limit_args(p: argparse._ActionsContainer) -> None:
+    """Expose resource budgets through CLI and its matching config-file keys."""
+    options = {
+        "llm-concurrency": "Independent model sessions (default 1); also limited by --workers.",
+        "cache-max-memory-entries": "Maximum in-memory model responses (default 256; 0 disables memory caching).",
+        "cache-max-memory-bytes": "Maximum UTF-8 response bytes in memory (default 16777216).",
+        "cache-max-disk-entries": "Maximum persistent model responses (default 2048).",
+        "cache-max-disk-bytes": "Maximum persistent response bytes (default 268435456).",
+        "vision-max-pixels": "Maximum rendered vision pixels (default 4000000).",
+        "vision-render-dpi": "Requested vision rendering resolution (default 300 DPI; bounded by pixel limits).",
+        "vision-max-dimension-pixels": "Maximum vision image width or height (default 4096).",
+        "vision-max-encoded-bytes": "Maximum encoded vision image bytes (default 8388608).",
+    }
+    for flag, help_text in options.items():
+        p.add_argument(f"--{flag}", type=int, default=None, metavar="N", help=help_text)
+    p.add_argument(
+        "--cache-ttl-s", type=float, default=None, help="Response cache lifetime in seconds (default 2592000)."
+    )
+    p.add_argument(
+        "--full-text-extraction",
+        action="store_true",
+        help="Read all selected pages before token truncation, preserving the legacy extraction strategy.",
     )

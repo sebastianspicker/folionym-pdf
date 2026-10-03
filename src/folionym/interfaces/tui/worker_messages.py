@@ -22,10 +22,11 @@ class _RunLog(_MessageBase):
 class _RunFinished(_MessageBase):
     """Terminal result for the immediate single-file operation."""
 
-    def __init__(self, ok: bool, message: str) -> None:
+    def __init__(self, ok: bool, message: str, outcome: str = "failed") -> None:
         super().__init__()
         self.ok = ok
         self.message = message
+        self.outcome = outcome
 
 
 class _RunProgress(_MessageBase):

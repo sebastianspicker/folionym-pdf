@@ -1,5 +1,4 @@
-/* Folionym — Folio Instrument design system
-   Modular entry; modules listed in cascade order. */
+/* Folionym Reading Room design system. Modules are listed in cascade order. */
 
 @import "./styles/tokens.css";
 @import "./styles/base.css";
@@ -8,3 +7,4 @@
 @import "./styles/source.css";
 @import "./styles/preview.css";
 @import "./styles/apply.css";
+@import "./styles/reading-room.css";

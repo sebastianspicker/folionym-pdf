@@ -80,7 +80,7 @@ def _load_yaml_config_file(path: Path, raw: str, *, raise_on_error: bool) -> dic
     return data
 
 
-def _load_config_file(path: str | Path, *, raise_on_error: bool = False) -> dict[str, object]:
+def load_config_file(path: str | Path, *, raise_on_error: bool = False) -> dict[str, object]:
     """Load JSON or YAML config file. Returns a dict unless raise_on_error is enabled."""
     p = Path(path)
     if not p.exists():
@@ -107,12 +107,7 @@ def _load_config_file(path: str | Path, *, raise_on_error: bool = False) -> dict
     )
 
 
-def load_config_file(path: str | Path, *, raise_on_error: bool = False) -> dict[str, object]:
-    """Load a JSON or YAML CLI config file."""
-    return _load_config_file(path, raise_on_error=raise_on_error)
-
-
-def _load_override_category_map(path: str | Path) -> dict[str, str]:
+def load_override_category_map(path: str | Path) -> dict[str, str]:
     """Load CSV with columns filename,category (or path,category). Returns dict filename -> category."""
     result: dict[str, str] = {}
     p = Path(path)

@@ -1,21 +1,24 @@
-"""Watch-mode helpers for the batch renamer."""
+"""Watch mode: periodic discovery and rename of new or changed PDFs."""
 
 from __future__ import annotations
 
 import contextlib
 import logging
 import signal
+import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import FrameType
 from typing import Any
 
-from ..naming.rules import ProcessingRules
+from ..naming.rules import ProcessingRules, load_processing_rules
 from ..settings import RenamerConfig
-from .discovery import _collect_pdf_files_with_config
+from .batch import RenameHooks, RenameRunSummary, rename_pdfs_in_directory
+from .discovery import collect_configured_pdf_files
 
+logger = logging.getLogger(__name__)
 _SignalHandler = Callable[[int, FrameType | None], Any] | int | signal.Handlers | None
 _RECOVERABLE_WATCH_EXCEPTIONS = (
     AttributeError,
@@ -27,14 +30,15 @@ _RECOVERABLE_WATCH_EXCEPTIONS = (
 )
 
 
-@dataclass(frozen=True)
-class WatchLoopDependencies:
-    """Injectable discovery, rule-loading, rename, and logging dependencies."""
+SummaryCallback = Callable[[RenameRunSummary], None]
 
-    collect_pdf_files_fn: Callable[..., list[Path]]
-    load_processing_rules_fn: Callable[..., ProcessingRules | None]
-    rename_pdfs_in_directory_fn: Callable[..., set[Path]]
-    logger: logging.Logger
+
+@dataclass(frozen=True)
+class WatchHooks:
+    """Optional interface hooks forwarded to every per-file batch run."""
+
+    rename: RenameHooks = field(default_factory=RenameHooks)
+    on_summary: SummaryCallback | None = None
 
 
 @dataclass(frozen=True)
@@ -44,7 +48,7 @@ class WatchLoopContext:
     path: Path
     config: RenamerConfig
     interval_seconds: float
-    deps: WatchLoopDependencies
+    hooks: WatchHooks = WatchHooks()
 
 
 @dataclass
@@ -62,6 +66,7 @@ class WatchIterationContext:
     path: Path
     config: RenamerConfig
     rules: ProcessingRules | None
+    hooks: WatchHooks = WatchHooks()
 
 
 def _cleanup_watch_state(state: WatchLoopState) -> WatchLoopState:
@@ -77,16 +82,9 @@ def _changed_watch_files(
     config: RenamerConfig,
     rules: ProcessingRules | None,
     state: WatchLoopState,
-    collect_pdf_files_fn: Callable[..., list[Path]],
 ) -> list[Path]:
     """Return unseen or mtime-changed PDFs newest first, excluding prior rename targets."""
-    files = _collect_pdf_files_with_config(
-        path,
-        config,
-        files_override=None,
-        rules=rules,
-        collect_pdf_files_fn=collect_pdf_files_fn,
-    )
+    files = collect_configured_pdf_files(path, config, files_override=None, rules=rules)
     to_process: list[Path] = []
     for file_path in files:
         if file_path in state.renamed_targets:
@@ -121,19 +119,21 @@ def _process_watch_files(
     to_process: list[Path],
     state: WatchLoopState,
     stop_requested: Callable[[], bool],
-    rename_pdfs_in_directory_fn: Callable[..., set[Path]],
 ) -> WatchLoopState:
     """Rename each changed file until stopped, updating watch state after each success."""
     for single in to_process:
         if stop_requested():
             break
-        actual_targets = rename_pdfs_in_directory_fn(
+        result = rename_pdfs_in_directory(
             context.path,
             config=context.config,
             files_override=[single],
             rules_override=context.rules,
+            hooks=context.hooks.rename,
         )
-        state = _remember_watch_targets(state, actual_targets)
+        if result.summary is not None and context.hooks.on_summary is not None:
+            context.hooks.on_summary(result.summary)
+        state = _remember_watch_targets(state, result.renamed_targets)
     return state
 
 
@@ -142,22 +142,15 @@ def _run_watch_iteration(
     config: RenamerConfig,
     state: WatchLoopState,
     stop_requested: Callable[[], bool],
-    *,
-    deps: WatchLoopDependencies,
+    hooks: WatchHooks | None = None,
 ) -> WatchLoopState:
     """Refresh state and rules, discover changed files, and process one iteration."""
     state = _cleanup_watch_state(state)
     rules_file = config.output.paths.rules_file
-    rules = deps.load_processing_rules_fn(rules_file, raise_on_error=bool(rules_file))
-    context = WatchIterationContext(path, config, rules)
-    to_process = _changed_watch_files(path, config, rules, state, deps.collect_pdf_files_fn)
-    return _process_watch_files(
-        context,
-        to_process,
-        state,
-        stop_requested,
-        deps.rename_pdfs_in_directory_fn,
-    )
+    rules = load_processing_rules(rules_file, raise_on_error=bool(rules_file))
+    context = WatchIterationContext(path, config, rules, hooks or WatchHooks())
+    to_process = _changed_watch_files(path, config, rules, state)
+    return _process_watch_files(context, to_process, state, stop_requested)
 
 
 def _run_watch_cycle(
@@ -167,17 +160,11 @@ def _run_watch_cycle(
 ) -> WatchLoopState:
     """Run one watch iteration, retaining state after recoverable failures."""
     try:
-        next_state = _run_watch_iteration(
-            context.path,
-            context.config,
-            state,
-            stop_requested,
-            deps=context.deps,
-        )
+        next_state = _run_watch_iteration(context.path, context.config, state, stop_requested, context.hooks)
     except _RECOVERABLE_WATCH_EXCEPTIONS as exc:
         if stop_requested():
             return state
-        context.deps.logger.exception("Watch iteration failed: %s", exc)
+        logger.exception("Watch iteration failed: %s", exc)
         time.sleep(context.interval_seconds)
         return state
     if not stop_requested():
@@ -191,9 +178,7 @@ def _install_watch_signal_handlers(
     """Install SIGINT and SIGTERM handlers only on the main thread and return the originals."""
     # signal.signal() is only legal on the main thread; embedded/TUI callers may
     # run watch mode from a worker thread.
-    import threading as _threading
-
-    is_main_thread = _threading.current_thread() is _threading.main_thread()
+    is_main_thread = threading.current_thread() is threading.main_thread()
     if not is_main_thread:
         return (False, None, None)
     return (
@@ -216,12 +201,12 @@ def _restore_watch_signal_handlers(
         signal.signal(signal.SIGINT, original_sigint)
 
 
-def run_watch_loop_impl(
+def run_watch_loop(
     directory: str | Path,
     *,
     config: RenamerConfig,
-    interval_seconds: float,
-    deps: WatchLoopDependencies,
+    interval_seconds: float = 60.0,
+    hooks: WatchHooks | None = None,
 ) -> None:
     """Run rename in a loop, scanning the directory every interval_seconds. Processes new/changed PDFs."""
     path = Path(directory).resolve()
@@ -233,18 +218,18 @@ def run_watch_loop_impl(
     def handle_stop(sig: int, frame: FrameType | None) -> None:
         """Set the loop stop flag and log the received signal."""
         nonlocal stop_requested
-        deps.logger.info("Watch mode: received signal %s, stopping...", sig)
+        logger.info("Watch mode: received signal %s, stopping...", sig)
         stop_requested = True
 
     is_main_thread, original_sigterm, original_sigint = _install_watch_signal_handlers(handle_stop)
 
     # Track successful rename targets so watch mode does not process its own outputs.
-    context = WatchLoopContext(path, config, interval_seconds, deps)
+    context = WatchLoopContext(path, config, interval_seconds, hooks or WatchHooks())
     loop_state = WatchLoopState(seen={}, renamed_targets=set())
-    deps.logger.info("Watch mode: scanning %s every %.1fs (Ctrl+C or SIGTERM to stop)", path, interval_seconds)
+    logger.info("Watch mode: scanning %s every %.1fs (Ctrl+C or SIGTERM to stop)", path, interval_seconds)
     try:
         while not stop_requested:
             loop_state = _run_watch_cycle(context, loop_state, lambda: stop_requested)
     finally:
         _restore_watch_signal_handlers(is_main_thread, original_sigterm, original_sigint)
-        deps.logger.info("Watch stopped")
+        logger.info("Watch stopped")

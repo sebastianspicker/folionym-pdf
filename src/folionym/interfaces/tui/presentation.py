@@ -4,17 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from ...infrastructure.http import validate_http_endpoint
+from ...application.privacy import external_llm_endpoint, run_contacts_model
+from ...settings import RenamerConfig
 from .assets import (
-    _DRYRUN_LOG_RE,
-    _RENAME_LOG_RE,
     ERROR_COLOR,
-    PREVIEW_COLOR,
-    PROCESS_RE,
     SUCCESS_COLOR,
     WARNING_COLOR,
-    _format_dryrun_match,
-    _format_rename_match,
 )
 
 RunCounts = dict[str, int]
@@ -64,17 +59,20 @@ def snapshot_from_readers(
     }
 
 
-def endpoint_disclosure(use_llm: bool, endpoint_value: str) -> tuple[str, str]:
-    """Describe the configured content boundary without exposing endpoint details."""
-    if not use_llm:
+def endpoint_disclosure(config: RenamerConfig | None) -> tuple[str, str]:
+    """Describe the content boundary of the run *config* would perform, without exposing endpoint details.
+
+    ``None`` stands for a form that does not yet build a valid configuration.
+    """
+    if config is None:
+        return "HTTP MODEL", "Review the endpoint before sending document-derived content."
+    if not run_contacts_model(config):
         return "HEURISTICS ONLY", "Document text stays on this machine."
-    if not endpoint_value:
-        return "LOCAL HTTP MODEL", "Document text may be sent to the preset local endpoint."
     try:
-        endpoint = validate_http_endpoint(endpoint_value)
+        external = external_llm_endpoint(config)
     except ValueError:
         return "HTTP MODEL", "Review the endpoint before sending document-derived content."
-    if endpoint.is_loopback:
+    if external is None:
         return "LOCAL HTTP MODEL", "Document text may be sent to the configured local endpoint."
     return "EXTERNAL HTTP MODEL", "Document-derived content may leave this machine."
 
@@ -89,43 +87,6 @@ def effective_configuration_lines(language: str, case_style: str, preset: str, o
             f"OCR            {'enabled' if ocr_enabled else 'off'}",
         )
     )
-
-
-def _format_rename_line(stripped: str) -> tuple[str, str | None] | None:
-    """Format applied and preview rename lines when recognized."""
-    if "Renamed '" in stripped and "' to '" in stripped:
-        formatted = _RENAME_LOG_RE.sub(_format_rename_match, stripped) if _RENAME_LOG_RE.search(stripped) else stripped
-        return formatted, "renamed"
-    if "Dry-run: would rename '" in stripped and "' to '" in stripped:
-        formatted = _DRYRUN_LOG_RE.sub(_format_dryrun_match, stripped) if _DRYRUN_LOG_RE.search(stripped) else stripped
-        return formatted, "renamed"
-    return None
-
-
-def _format_status_outcome(stripped: str) -> tuple[str, str | None] | None:
-    """Format skip and failure outcomes when recognized."""
-    if "Skipping " in stripped or "Skipped" in stripped or "content is empty" in stripped:
-        return f"[{WARNING_COLOR}]SKIP[/{WARNING_COLOR}] [dim]{stripped}[/dim]", "skipped"
-    if "Failed" in stripped or "Error" in stripped or "failed" in stripped:
-        return f"[{ERROR_COLOR}]ERR[/{ERROR_COLOR}]  [bold {ERROR_COLOR}]{stripped}[/bold {ERROR_COLOR}]", "failed"
-    return None
-
-
-def _format_context_line(stripped: str) -> tuple[str, str | None]:
-    """Format progress and informational lines without changing counters."""
-    if PROCESS_RE.search(stripped):
-        return f"[dim]{stripped}[/dim]", None
-    if stripped.startswith("Summary:"):
-        return f"[bold]{stripped}[/bold]", None
-    if "Heuristic-only mode" in stripped:
-        return f"[{PREVIEW_COLOR}]INFO[/{PREVIEW_COLOR}] [dim]{stripped}[/dim]", None
-    return stripped, None
-
-
-def format_run_log_line(line: str) -> tuple[str, str | None]:
-    """Return Rich markup and an optional counter key for one worker log line."""
-    stripped = line.rstrip()
-    return _format_rename_line(stripped) or _format_status_outcome(stripped) or _format_context_line(stripped)
 
 
 def format_run_summary(counts: RunCounts, preview: bool, *, separator: str) -> str:
@@ -154,11 +115,3 @@ def metric_summary(counts: RunCounts, preview: bool) -> tuple[str, str, str]:
 def completion_summary(counts: RunCounts, preview: bool) -> str:
     """Return the final completion copy, including the established empty-run fallback."""
     return format_run_summary(counts, preview, separator="  ") or "no files processed"
-
-
-def parse_progress(line: str) -> tuple[int, int] | None:
-    """Parse a producer progress line while protecting the progress widget from zero totals."""
-    match = PROCESS_RE.search(line)
-    if not match:
-        return None
-    return int(match.group(1)), max(1, int(match.group(2)))

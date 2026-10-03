@@ -3,23 +3,33 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, replace
 from datetime import datetime
 
-from ..llm.models import SimpleFilenameOptions
-from ..llm.simple import get_document_filename_simple
-from ..rename_ops import sanitize_filename_base
+from ..infrastructure.filenames import sanitize_filename_base
 from ..settings import RenamerConfig
-from .models import (
-    FilenameGenerationRequest,
-    _FilenameDependencies,
-    _FilenameMetadataParts,
-    _FilenameTemplateInput,
-    _FilenameTemplateTokens,
-)
+from .models import FilenameDependencies, FilenameMetadataParts
+from .scoring import PLACEHOLDER_CATEGORIES
+from .simple_filename import SimpleFilenameOptions, get_document_filename_simple
 from .structured import extract_structured_fields
 from .tokens import convert_case, split_to_tokens
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _FilenameTemplateInput:
+    """Inputs used to build or render a filename."""
+
+    filename: str
+    date_str: str
+    project: str
+    version: str
+    category_for_filename: str
+    category_clean: list[str]
+    keyword_clean: list[str]
+    summary_clean: list[str]
+    structured_fields: dict[str, str] | None = None
 
 
 def _filename_sep(config: RenamerConfig) -> str:
@@ -34,7 +44,8 @@ def _should_use_timestamp_fallback(
     summary_clean: list[str],
 ) -> bool:
     """True when category and all content-derived tokens are empty/unknown (full fallback)."""
-    empty_cat = (category_for_filename or "").strip().lower() in {"unknown", "document", "na", ""}
+    category = (category_for_filename or "").strip().lower()
+    empty_cat = not category or category in PLACEHOLDER_CATEGORIES
     no_tokens = not category_clean and not keyword_clean and not summary_clean
     return bool(empty_cat and no_tokens)
 
@@ -76,12 +87,10 @@ def _apply_configured_template(
             date_str=date_str,
             project=(config.output.naming.project or "").strip(),
             version=(config.output.naming.version or "").strip(),
-            tokens=_FilenameTemplateTokens(
-                category_for_filename=category_for_filename,
-                category_clean=category_clean,
-                keyword_clean=[],
-                summary_clean=[],
-            ),
+            category_for_filename=category_for_filename,
+            category_clean=category_clean,
+            keyword_clean=[],
+            summary_clean=[],
         ),
         config,
     )
@@ -160,16 +169,7 @@ def _build_filename_str(
     else:
         filename = _build_separated_filename(template_input, config)
 
-    filename = _apply_filename_template(
-        _FilenameTemplateInput(
-            filename=filename,
-            date_str=template_input.date_str,
-            project=template_input.project,
-            version=template_input.version,
-            tokens=template_input.tokens,
-        ),
-        config,
-    )
+    filename = _apply_filename_template(replace(template_input, filename=filename), config)
     return _truncate_filename_to_max_chars(filename, config)
 
 
@@ -219,7 +219,7 @@ def _normalize_filename_separators(parts: list[str], sep: str) -> str:
     return sep.join(part for part in filename.split(sep) if part)
 
 
-def _with_structured_metadata(metadata: dict[str, object], pdf_content: str, config: RenamerConfig) -> dict[str, str]:
+def with_structured_metadata(metadata: dict[str, object], pdf_content: str, config: RenamerConfig) -> dict[str, str]:
     """Extract structured fields and add them to the result metadata."""
     if not config.extraction.use_structured_fields:
         return {}
@@ -230,14 +230,13 @@ def _with_structured_metadata(metadata: dict[str, object], pdf_content: str, con
     return structured_fields
 
 
-def _generate_simple_filename(
+def generate_simple_filename(
     pdf_content: str,
-    request: FilenameGenerationRequest,
+    config: RenamerConfig,
     date_str: str,
-    dependencies: _FilenameDependencies,
+    dependencies: FilenameDependencies,
 ) -> tuple[str, dict[str, object]]:
     """Generate and sanitize a filename through the one-shot LLM path."""
-    config = request.config
     simple_part = get_document_filename_simple(
         dependencies.llm_client,
         pdf_content,
@@ -245,8 +244,8 @@ def _generate_simple_filename(
             language=config.output.naming.language,
             max_content_chars=config.llm.content.max_content_chars or config.llm.content.max_context_chars,
             max_content_tokens=config.llm.content.max_content_tokens,
-            cache=dependencies.response_cache,
-            cache_key_base=dependencies.cache_key_base,
+            cache=dependencies.cache.response_cache,
+            cache_key_base=dependencies.cache.cache_key_base,
         ),
     )
     sep = _filename_sep(config)
@@ -254,13 +253,13 @@ def _generate_simple_filename(
     filename = _apply_configured_template(filename, date_str, simple_part, [simple_part], config)
     filename = _truncate_filename_to_max_chars(filename, config)
     metadata: dict[str, object] = {"category": simple_part, "summary": "", "keywords": ""}
-    _with_structured_metadata(metadata, pdf_content, config)
+    with_structured_metadata(metadata, pdf_content, config)
     return sanitize_filename_base(filename), metadata
 
 
-def _final_generated_filename(
+def final_generated_filename(
     date_str: str,
-    parts: _FilenameMetadataParts,
+    parts: FilenameMetadataParts,
     structured_fields: dict[str, str],
     config: RenamerConfig,
 ) -> str:
@@ -279,13 +278,11 @@ def _final_generated_filename(
             date_str=date_str,
             project=project,
             version=version,
-            tokens=_FilenameTemplateTokens(
-                category_for_filename=parts.category_for_filename,
-                category_clean=parts.category_clean,
-                keyword_clean=parts.keyword_clean,
-                summary_clean=parts.summary_clean,
-                structured_fields=structured_fields,
-            ),
+            category_for_filename=parts.category_for_filename,
+            category_clean=parts.category_clean,
+            keyword_clean=parts.keyword_clean,
+            summary_clean=parts.summary_clean,
+            structured_fields=structured_fields,
         ),
         config,
     )

@@ -22,14 +22,12 @@ body {
   min-width: 320px;
   min-height: 100vh;
   color: var(--ink);
-  background:
-    radial-gradient(1200px 500px at 12% -10%, rgb(11 106 90 / 6%), transparent 55%),
-    radial-gradient(900px 400px at 100% 0%, rgb(44 74 124 / 5%), transparent 50%),
-    var(--canvas);
+  background: var(--canvas);
   font-family: var(--sans);
   font-size: 14px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
 }
 
 button,
@@ -136,10 +134,12 @@ h3 {
 
 .kicker {
   margin: 0 0 6px;
-  color: var(--verdigris-ink);
+  color: var(--faint);
+  font-family: var(--mono);
   font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .lede {

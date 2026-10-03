@@ -30,13 +30,6 @@ class ApplyStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
-class ApplyPolicy(StrEnum):
-    """Collision policy for applying a proposal."""
-
-    UNIQUE_AVAILABLE = "unique_available"
-    EXACT_REVIEWED = "exact_reviewed"
-
-
 @dataclass(frozen=True)
 class Proposal:
     """A typed extraction and naming outcome before any filesystem mutation."""
@@ -111,6 +104,10 @@ class PreviewPlan:
     items: tuple[PreviewItem, ...]
     created_at: datetime
     revision: int = 1
+
+    def count(self, status: PreviewStatus) -> int:
+        """Count items with ``status``."""
+        return sum(item.status == status for item in self.items)
 
 
 @dataclass(frozen=True)

@@ -84,7 +84,7 @@ export function SourcePage({
     }
   }, []);
 
-  const { run, error: runError, setError: setRunError } = useRun(runId, onRunComplete);
+  const { run, error: runError, setError: setRunError, retry: retryRun } = useRun(runId, onRunComplete);
 
   const startPreview = async (acknowledge = false) => {
     setStartError("");
@@ -164,6 +164,7 @@ export function SourcePage({
           </Modal>
           <RunOverlay
             error={runError}
+            onRetry={retryRun}
             onCancel={() => {
               if (runId) void api.cancel(runId);
             }}

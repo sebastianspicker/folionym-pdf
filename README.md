@@ -1,91 +1,81 @@
 # Folionym
 
+**Rename PDFs from what's actually inside them — locally, with a review step before anything moves.**
+
 [![CI](https://github.com/sebastianspicker/folionym/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastianspicker/folionym/actions/workflows/ci.yml)
 [![Security](https://github.com/sebastianspicker/folionym/actions/workflows/security.yml/badge.svg)](https://github.com/sebastianspicker/folionym/actions/workflows/security.yml)
+[![Pages demo](https://github.com/sebastianspicker/folionym/actions/workflows/pages.yml/badge.svg)](https://github.com/sebastianspicker/folionym/actions/workflows/pages.yml)
+[![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-3776AB)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-0e6b57)](LICENSE)
 
-Folionym extracts content and metadata from PDF files and constructs structured
-filenames. It combines category heuristics with optional OCR, vision, and an
-HTTP LLM endpoint. The package provides a command-line interface, a Textual
-terminal interface, a local browser interface, and an undo command.
+Folionym reads the text and metadata of a PDF, works out a useful filename with
+deterministic rules and optional local-LLM help, and shows you the result before
+touching the filesystem. You can drive it from the command line, a terminal UI,
+or a browser UI that only listens on your own machine.
 
-The current source identifies itself as `0.4.0a1`. This is an alpha candidate,
-not evidence of a published release. Treat rename operations as supervised file
-operations: preview proposed names, keep backups of important documents, and
-review the [limitations](#current-capabilities-and-limitations).
+**Try it without installing:** [open the interactive demo](https://sebastianspicker.github.io/folionym/)
+— it runs entirely in your browser on simulated files.
 
-## Project purpose and scope
+> **Status:** alpha (`0.4.0a1`). Keep backups of important documents and review
+> proposed names before applying them.
 
-Folionym processes one PDF, one or more directories, or a directory watch loop.
-The default filename shape is:
+![Folionym Preview screen with a rename ledger](docs/screenshots/02-preview.png)
+
+## What it does
+
+Given a folder of PDFs, Folionym proposes a name for each one:
 
 ```text
 YYYYMMDD-category-keywords-summary.pdf
 ```
 
-The filename can also use a template with date, project, category, keyword,
-summary, version, invoice ID, amount, and company fields. Processing runs under
-the current operating-system account. Folionym does not provide a hosted
-service, remote authentication, or a container deployment.
-
-## Current capabilities and limitations
-
-Available capabilities:
+It can also build names from a template using date, project, category,
+keywords, summary, version, invoice ID, amount, and company fields.
 
 - PDF text and metadata extraction with PyMuPDF
-- heuristic category scoring with bundled JSON data
-- optional HTTP(S) endpoint client for summaries, keywords, categories, and
-  vision
-- optional OCR through OCRmyPDF
-- dry runs, per-file confirmation, plan files, metadata exports, and summaries
-- recursive discovery, include and exclude patterns, category overrides, and
-  rules files
-- backups, rename logs, and constrained undo
-- browser, terminal, batch CLI, manual single-file, and watch workflows
-- sequential or worker-based proposal calculation with ordered rename handling
+- Heuristic classification using bundled category data
+- Optional OCR through OCRmyPDF and optional vision through a compatible model
+- OpenAI-compatible HTTP endpoints for summaries, keywords, categories, and vision
+- Directory, recursive, single-file, watch, dry-run, and interactive workflows
+- Exact reviewed plans in the browser and directory TUI
+- Backups, rename logs, constrained undo, plan export, metadata export, and run summaries
 
-Current limitations:
+Everything runs as one local process under your own user account. The LLM
+endpoint and the optional post-rename hook are the only places document-derived
+content can leave the machine.
 
-- Python 3.14 or later is required.
-- Run one Folionym process per target directory. There is no interprocess lock
-  for concurrent writers.
-- Input size has no hard byte limit. Page extraction is unlimited unless
-  `--max-pages-for-extraction` is set, worker count has no hard maximum, and
-  OCR has no application-level timeout.
-- OCR, vision, heuristic classification, and LLM output can be incomplete or
-  incorrect. Review proposed names before applying them.
-- The browser and directory TUI retain reviewed Preview plans and apply exact
-  targets without another model call. A changed source, duplicate selected
-  target, or occupied target fails rather than receiving a replacement name.
-  Material TUI source or configuration edits invalidate its plan, and a
-  cancelled Preview cannot apply. TUI Rename one PDF remains a confirmed,
-  immediate unique-available operation.
-- Browser plans and reports exist only in the running process. Restarting
-  `folionym-web` invalidates them.
-- The browser server binds only to loopback. There is no supported remote or
-  multi-user deployment.
-- Configured LLM endpoints and post-rename hooks can receive content or metadata
-  derived from documents. See [SECURITY.md](SECURITY.md).
+## A quick tour
+
+| Source | Preview |
+| --- | --- |
+| [![Choose a folder or a single PDF](docs/screenshots/01-source.png)](docs/screenshots/01-source.png) | [![Review proposed names in the ledger](docs/screenshots/02-preview.png)](docs/screenshots/02-preview.png) |
+| Pick a folder or a single file and set the naming rules. | Review every proposal, filter by status, and inspect the evidence behind each name. |
+
+| Apply report | Dark theme |
+| --- | --- |
+| [![Per-file apply report](docs/screenshots/03-apply.png)](docs/screenshots/03-apply.png) | [![Preview in the dark theme](docs/screenshots/04-preview-dark.png)](docs/screenshots/04-preview-dark.png) |
+| See exactly what was renamed, skipped, or left unchanged. | A light and dark theme are both included. |
+
+Prefer a hands-on look first? The [static demo](https://sebastianspicker.github.io/folionym/)
+reproduces these screens with simulated documents and never calls the local
+backend.
 
 ## Requirements
 
-Runtime requirements:
+Runtime requirements depend on the features you use:
 
 - CPython 3.14 or later
-- PyMuPDF through the `pdf` extra for normal PDF processing
-- an OpenAI-compatible HTTP endpoint when LLM or vision features are enabled
-- OCRmyPDF and its platform prerequisites, including Tesseract, when OCR is
-  enabled
+- PyMuPDF through the `pdf` extra for PDF processing
+- An OpenAI-compatible HTTP endpoint when LLM or vision features are enabled
+- OCRmyPDF and its platform prerequisites, including Tesseract, when OCR is enabled
 
-Contributor requirements:
+Contributors need CPython 3.14.6, [uv](https://docs.astral.sh/uv/), Node.js
+22.12 or later, npm, and Make. The pinned Python version and CI version live in
+`.python-version` and `.github/workflows/ci.yml`.
 
-- CPython 3.14.6, matching `.python-version` and CI
-- [uv](https://docs.astral.sh/uv/)
-- Node.js 22 and npm for the React frontend
-- Make
+## Install from source
 
-## Installation
-
-Create an isolated environment and install from a source checkout:
+Create an isolated environment and install the PDF feature:
 
 ```bash
 python3.14 -m venv .venv
@@ -94,14 +84,12 @@ python -m pip install --upgrade pip
 python -m pip install -e '.[pdf]'
 ```
 
-Install only the interfaces and optional processing features you use:
+Add the interfaces and optional processing features you need:
 
 ```bash
 python -m pip install -e '.[pdf,tui,web]'
 python -m pip install -e '.[pdf,tokens,ocr,tui,web]'
 ```
-
-The extras are:
 
 | Extra | Adds |
 | --- | --- |
@@ -109,36 +97,112 @@ The extras are:
 | `tokens` | token-aware content limits through tiktoken |
 | `ocr` | OCRmyPDF integration |
 | `tui` | Textual terminal interface |
-| `web` | FastAPI, Uvicorn, PyMuPDF, and the local browser interface |
+| `web` | FastAPI, Uvicorn, PyMuPDF, and the browser interface |
 | `dev` | Python test, lint, format, and type-check tools |
 
-For contributor setup, install every extra and the frontend dependencies:
+For a contributor checkout, install all Python extras and the locked frontend
+dependencies from the repository root:
 
 ```bash
 make install-dev
 ```
 
-No package-index publication is documented for `0.4.0a1`. If a GitHub
-prerelease exists, install its wheel by local path after verifying its
-checksum.
+No package-index publication is configured. If a GitHub prerelease is
+available, follow its authored release notes and verify its checksum before
+installing the wheel.
+
+## Quick start
+
+Preview a directory without sending content to an LLM:
+
+```bash
+folionym --dir ./input_files --no-llm --dry-run
+```
+
+Preview a recursive selection:
+
+```bash
+folionym --dir ./input_files --recursive --include '*.pdf' \
+  --exclude 'draft-*' --dry-run
+```
+
+Apply proposals, confirming each file and recording backups and an undo log:
+
+```bash
+folionym --dir ./input_files --interactive \
+  --backup-dir ./backup --rename-log ./rename.log
+folionym-undo --rename-log ./rename.log --dry-run
+```
+
+Other entry points:
+
+```bash
+folionym-tui
+folionym-web
+folionym --manual ./input_files/document.pdf
+folionym --dir ./input_files --watch --watch-interval 60
+folionym --doctor
+```
+
+`folionym-web` serves `http://127.0.0.1:8765/source` and opens your default
+browser. Use `folionym-web --port 9000 --no-open` to pick another loopback port
+without opening a browser. See the [browser guide](docs/frontend.md) and the
+[terminal guide](docs/tui.md) for their reviewed workflows, and run
+`folionym --help` for the complete CLI option list.
+
+## How renaming stays safe
+
+Folionym has two deliberate apply policies:
+
+- **Unique-available.** Conventional CLI runs and immediate TUI single-file
+  renames use a target that is free at the moment of the move. A collision can
+  receive a numeric suffix.
+- **Exact reviewed.** Browser and directory-TUI plans apply the exact target you
+  reviewed. Apply rechecks source identity, selected duplicates, and target
+  availability, then fails on a conflict instead of quietly choosing another
+  name.
+
+A few consequences worth knowing:
+
+- CLI dry run and apply are separate invocations and recompute proposals.
+  `--plan-file` exports proposals; it is not consumed later as an apply plan.
+- Browser plans and reports live only in the running server process. Completed
+  runs expire after one hour or when more than 32 are retained; active
+  operations pin their inputs. An expired plan needs a new Preview.
+- The directory TUI keeps a completed plan until you apply it or a material
+  source or settings change invalidates it.
+
+The [architecture guide](DESIGN.md) is the reference for these flows and their
+package boundaries.
 
 ## Configuration
 
-Configuration precedence is:
+For the `folionym` CLI, effective values are resolved in this order:
 
-1. CLI flags
-2. Environment defaults (for supported settings)
-3. Config file values (`--config` JSON/YAML)
-4. Named preset and built-in defaults
+1. explicitly supplied CLI options;
+2. supported environment variables;
+3. JSON or YAML values loaded with `--config`;
+4. a named `--preset` and built-in defaults.
 
-This precedence applies to the `folionym` CLI. The browser and TUI load form
-values from `~/.folionym_ui.json` and pass the current form as explicit runtime
-configuration. That settings file is UI state, not a `--config` file or another
-CLI precedence layer.
+Presets rank below explicit options, environment variables, and the config file.
+The five `--preset` values contribute these defaults:
 
-An explicit CLI value always wins. JSON and YAML configuration files must
-contain a mapping and use the same option names as the internal configuration
-keys. For example:
+- `scanned`: enables the vision fallback and simple naming mode;
+- `high-confidence-heuristic`: skips the LLM category step when the heuristic
+  score is at least 0.5 and its gap at least 0.3;
+- `fast`: heuristics first, with the LLM off and stricter heuristic thresholds
+  (score 0.6, gap 0.25);
+- `accurate`: more LLM analysis, with separate LLM calls and permissive
+  heuristic thresholds;
+- `batch`: four workers and the persistent response cache.
+
+In the browser and TUI, the form always sends every value, so a selected
+preset's mode switches (vision fallback and simple naming, LLM on or off,
+separate LLM calls, the response cache) take precedence over the form, while
+its thresholds and worker count only fill values the form leaves unset.
+
+Configuration files must contain a mapping and use internal configuration key
+names:
 
 ```yaml
 language: en
@@ -149,34 +213,29 @@ workers: 2
 max_pages_for_extraction: 20
 ```
 
-Validate a configuration without processing files:
+Validate it without processing PDFs:
 
 ```bash
 folionym --config ./folionym.yaml --dir ./input_files --validate-config
 ```
 
-The default LLM preset is `apple-silicon`, which selects
-`qwen2.5:3b` at `http://127.0.0.1:11434/v1/completions`. The `gpu` preset
-selects `qwen2.5:7b-instruct` at the same endpoint. Select it with
-`--llm-preset gpu`:
+The browser and TUI persist their form values in `~/.folionym_ui.json` and pass
+the current form as explicit runtime configuration. That UI state is not a CLI
+configuration file. An existing `~/.folionym_tui.json` can be migrated without
+deleting the old file.
 
-```bash
-folionym --dir ./input_files --llm-preset gpu --dry-run
-```
-
-Override both endpoint values when your service differs:
+The default LLM preset uses `qwen2.5:3b`; the `gpu` preset selects
+`qwen2.5:7b-instruct`. The configured default URL is the completions URL
+`http://127.0.0.1:11434/v1/completions`. With the default chat API, requests go
+to the derived `/v1/chat/completions` endpoint; `--no-chat-api` uses the
+completions endpoint itself, and `--no-json-mode` stops requesting a JSON
+response format. Override the endpoint explicitly when needed:
 
 ```bash
 FOLIONYM_LLM_URL=http://127.0.0.1:11434/v1/completions \
 FOLIONYM_LLM_MODEL=qwen2.5:3b \
 folionym --dir ./input_files --dry-run
 ```
-
-The configured log path defaults to
-`~/.local/share/folionym/error.log`, with `./error.log` as a fallback when the
-data directory cannot be used.
-
-Supported runtime environment variables:
 
 | Variable | Purpose |
 | --- | --- |
@@ -197,155 +256,62 @@ Supported runtime environment variables:
 | `FOLIONYM_USE_VISION_FALLBACK` | enable vision for low-text PDFs when true |
 | `FOLIONYM_VISION_FIRST` | try vision before text extraction when true |
 
-Boolean environment values accept the forms implemented by the resolver,
-including `1` and `true`.
+`.env.example` is a template only. Folionym does not load dotenv files; export
+values in the shell or arrange for a process manager to load them.
 
-The CLI presets are `--preset` (`high-confidence-heuristic`, `scanned`, `fast`, `accurate`, `batch`).
-The related extraction switches are `--vision-fallback`, `--vision-first`,
-`--vision-model`, and `--ocr`.
-Use `folionym --help` for the complete option list.
+The default log path is `~/.local/share/folionym/error.log`, with `./error.log`
+as a fallback when the user data directory cannot be used.
 
-## Usage
+## Limits and operating model
 
-Preview a directory without an LLM call:
+- Run one Folionym process per target directory. There is no interprocess lock
+  for concurrent writers.
+- The browser binds only to loopback and is not a remote or multi-user service.
+- Input size has no hard byte limit. Text extraction stops after accumulating
+  its token budget; `--full-text-extraction` restores reading all selected pages
+  before truncation, and `--max-pages-for-extraction` adds a page limit. Worker
+  count has no hard maximum, and OCR has no application-level timeout.
+- Model calls use one session by default. Opt in to independent sessions with
+  `--llm-concurrency`, bounded by the effective worker count. Cancellation stops
+  queued model calls; an in-flight request still runs until it finishes or times out.
+- Response caches and vision images have bounded resource budgets. See
+  [resource limits and performance](docs/performance.md) for defaults, options,
+  and the extraction compatibility switch.
+- PDF and OCR processing are not sandboxed. OCR, vision, heuristics, and LLM
+  output can be incomplete or incorrect.
+- Configured LLM endpoints and post-rename hooks can receive document-derived
+  content or metadata.
+- Logs, caches, exports, rename logs, and backups can contain private
+  document-adjacent information.
 
-```bash
-folionym --dir ./input_files --no-llm --dry-run
-```
+Read [SECURITY.md](SECURITY.md) before processing untrusted PDFs or using a
+non-loopback integration.
 
-Preview a recursive selection:
+## Repository map
 
-```bash
-folionym --dir ./input_files --recursive --include '*.pdf' \
-  --exclude 'draft-*' --dry-run
-```
-
-Use vision fallback for a scanned document set:
-
-```bash
-folionym --dir ./input_files --preset scanned --vision-model llava --dry-run
-```
-
-Try vision before text extraction:
-
-```bash
-folionym --dir ./input_files --vision-first --vision-model llava --dry-run
-```
-
-Use OCR:
-
-```bash
-folionym --dir ./input_files --ocr --dry-run
-```
-
-Apply a reviewed CLI configuration:
-
-```bash
-folionym --dir ./input_files
-```
-
-CLI dry run and apply are separate invocations. An apply invocation calculates
-proposals again from the current files and configuration; it does not retain
-targets from an earlier dry run. Use `--interactive` to confirm each proposal
-in the apply invocation, or use `--plan-file` when you need an exported plan
-without renaming files.
-
-Use `--interactive` to confirm each proposed rename. Use `--backup-dir` and
-`--rename-log` when you need a copy and an undo record:
-
-```bash
-folionym --dir ./input_files --interactive \
-  --backup-dir ./backup --rename-log ./rename.log
-folionym-undo --rename-log ./rename.log --dry-run
-```
-
-Launch the terminal interface:
-
-```bash
-folionym-tui
-```
-
-Directory Preview and Apply use one immutable reviewed plan in the TUI. Apply
-uses only its included ready names and does not recompute them; applying the
-plan consumes it. Rename one PDF remains a separately confirmed immediate
-operation. Settings from a valid directory Preview are stored in
-`~/.folionym_ui.json`; edits are not saved merely by closing the interface.
-See [docs/tui.md](docs/tui.md).
-
-Launch the local browser interface:
-
-```bash
-folionym-web
-```
-
-It serves `http://127.0.0.1:8765/source` and opens the default browser. To
-choose another loopback port without opening a browser:
-
-```bash
-folionym-web --port 9000 --no-open
-```
-
-See [docs/frontend.md](docs/frontend.md) for the browser workflow and runtime
-boundaries.
-
-Other useful commands:
-
-```bash
-folionym --doctor
-folionym --dir ./input_files --watch --watch-interval 60
-folionym --manual ./input_files/document.pdf
-folionym-undo --rename-log ./rename.log
-```
-
-## Repository structure
-
-| Path | Purpose |
+| Path | Responsibility |
 | --- | --- |
 | `src/folionym/settings/` | configuration models and precedence resolution |
-| `src/folionym/naming/`, `extraction/`, `llm/` | document naming, PDF extraction, and optional LLM work |
-| `src/folionym/application/`, `rename_ops/` | workflow orchestration and guarded filesystem mutation |
-| `src/folionym/infrastructure/`, `interfaces/` | shared low-level primitives and interface adapters |
-| `frontend/` | React 19, TypeScript, and Vite source |
-| `tests/` | contract, domain, integration, interface, and retained core coverage |
-| `scripts/` | distribution checks and repository hygiene |
-| `docs/` | interface guides and release notes |
-| `.github/workflows/` | CI and security workflows |
-| `pyproject.toml` | package metadata, dependencies, and Python tool settings |
-| `Makefile` | contributor and release verification commands |
-| `uv.lock` | locked Python dependency graph |
+| `src/folionym/naming/` | filename composition, heuristics, dates, templates, and model-assisted document analysis |
+| `src/folionym/extraction/` | PDF text, metadata, OCR, and extraction strategies |
+| `src/folionym/llm/` | LLM protocols, JSON completion, parsing, cache, and HTTP transport |
+| `src/folionym/application/` | discovery, proposals, batch and watch runs, reviewed plans, undo, single-file rename, artifacts, and hooks |
+| `src/folionym/rename_ops/` | filename safety, backups, and filesystem mutation |
+| `src/folionym/infrastructure/` | low-level file, filename-safety, HTTP, logging, error, and resource primitives |
+| `src/folionym/interfaces/` | `cli`, `tui`, and `web` adapters plus the shared `ui_settings` |
+| `frontend/` | React 19, TypeScript, and Vite browser source |
+| `src/folionym/web_dist/` | generated browser assets included in the wheel |
+| `tests/` | `contracts/` (public surface), `workflows/` (end to end), one directory per package, and `tooling/` (repository scripts) |
+| `scripts/` | architecture, hygiene, and distribution checks |
 
-The installed commands are:
+The installed commands are `folionym`, `folionym-tui`, `folionym-undo`, and
+`folionym-web`. Stable Python import facades are `folionym.config`,
+`folionym.filename`, `folionym.heuristics`, `folionym.renamer`, and
+`folionym.rename_ops`.
 
-| Command | Entry point |
-| --- | --- |
-| `folionym` | `folionym.interfaces.cli:main` |
-| `folionym-tui` | `folionym.interfaces.tui:main` |
-| `folionym-undo` | `folionym.interfaces.cli.undo:main` |
-| `folionym-web` | `folionym.interfaces.web.cli:main` |
+## Development and verification
 
-The public Python interfaces are owned by their modules:
-
-- `folionym.config.RenamerConfig`
-- `folionym.filename.FilenameGenerationRequest`
-- `folionym.filename.generate_filename`
-- `folionym.renamer.rename_pdfs_in_directory`
-- `folionym.renamer.suggest_rename_for_file`
-- `folionym.heuristics.CategoryCombineParams`
-
-The CLI uses standard-library argparse. The supported model integration is the
-HTTP-only LLM client. Here, HTTP-only distinguishes the network client from
-loading a model inside the Folionym process; endpoint URLs may use HTTP or
-HTTPS.
-
-## Development workflow
-
-Install dependencies:
-
-```bash
-make install-dev
-```
-
-Run focused checks while editing:
+Run commands from the repository root:
 
 ```bash
 make format
@@ -354,80 +320,46 @@ make typecheck
 make test
 make frontend-check
 make architecture-check
-```
-
-Follow [CONTRIBUTING.md](CONTRIBUTING.md) for code organization, pull request
-scope, and sensitive-data rules.
-
-## Testing
-
-The broad local gate is:
-
-```bash
 make release-check
 ```
 
-It runs dependency-lock validation; frontend type checking and the Vite build;
-repository hygiene; the architecture check; Ruff formatting and linting; strict
-mypy; the Python suite; a wheel and source distribution build; and an isolated
-installed-wheel check.
+`make format` modifies Python files. `make frontend-check` type-checks and
+builds the frontend into `src/folionym/web_dist/`. `make release-check` adds
+lock validation, repository hygiene, packaging, and an isolated installed-wheel
+check to all other gates.
 
-CI runs the full release gate on Linux with Python 3.14.6. macOS and Windows
-run targeted smoke jobs. The security workflow separately runs CodeQL,
-dependency review, pip-audit, and verified-secret scanning.
-
-## Deployment and operation
-
-Folionym is installed and run as a local Python application. The browser
-interface is a loopback Uvicorn process, not a remote server deployment. Keep
-the terminal that started `folionym-web` open for the duration of the browser
-session. Only one browser operation can be active at a time.
-
-Release publication is a manual GitHub prerelease procedure. Maintainers should
-follow [RELEASING.md](RELEASING.md) from a clean checkout of the exact commit
-being tagged.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the change workflow,
+[DESIGN.md](DESIGN.md) for architecture, and [RELEASING.md](RELEASING.md) for the
+manual prerelease procedure.
 
 ## Troubleshooting
 
-- Run `folionym --doctor` to check optional dependencies, data files, and LLM
+- Run `folionym --doctor` to inspect optional dependencies, data files, and LLM
   connectivity.
-- Run `folionym --validate-config --dir . --no-llm --dry-run` to isolate
-  configuration errors without processing PDFs.
 - Add `--no-llm` when the configured endpoint is unavailable.
-- Install `.[pdf]` if PyMuPDF is missing.
-- Install `.[ocr]` and OCRmyPDF's system prerequisites if `--ocr` is
-  unavailable.
-- Use `--require-https` or `FOLIONYM_REQUIRE_HTTPS=1` for non-loopback LLM
-  endpoints.
-- If the browser package is missing, install `.[web]`. If the packaged frontend
-  is absent in a source checkout, run `make frontend-check`.
+- Install `.[pdf]`, `.[ocr]`, `.[tui]`, or `.[web]` when the corresponding
+  optional feature is unavailable.
 - A rename log can undo only safe same-directory moves whose target still
-  exists and whose original path is free.
-- Inspect the configured log file for operational failures, but treat it as
-  document-adjacent private data.
+  exists and whose original path is free. Every entry must lie under the rename
+  log's directory (its trust root); relative entries resolve against the current
+  directory.
+- If a source checkout lacks current packaged browser assets, run
+  `make frontend-check` after installing frontend dependencies.
 
-## Security considerations
+## Documentation
 
-Process only documents you trust. PDF and OCR libraries run without an
-application sandbox. Keep caches, logs, exports, rename logs, backups, and
-browser artifacts on private storage.
-
-LLM requests do not follow redirects and ignore proxy environment variables.
-Remote HTTP emits a warning unless HTTPS is required. Post-rename hooks accept
-HTTP only for literal loopback addresses and require HTTPS elsewhere. Review
-[SECURITY.md](SECURITY.md) before sending document-derived data to either
-integration.
-
-## Contribution guidance
-
-Keep changes focused, add tests for behavior changes, and run the narrowest
-relevant check before `make release-check`. Do not add PDFs, extracted text,
-model request or response bodies, local logs, caches, or rename records to a
-pull request. Report vulnerabilities through the private channel described in
-[SECURITY.md](SECURITY.md).
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contributor workflow and
-[docs/README.md](docs/README.md) for the documentation index.
+- [Product scope](PRODUCT.md)
+- [Architecture](DESIGN.md)
+- [Browser interface and static demo](docs/frontend.md)
+- [Terminal interface](docs/tui.md)
+- [Resource limits and performance](docs/performance.md)
+- [Security policy](SECURITY.md)
+- [Contribution guide](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+- [Release process](RELEASING.md)
+- [Support](SUPPORT.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [All documentation](docs/README.md)
 
 ## License
 

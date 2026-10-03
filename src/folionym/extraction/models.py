@@ -16,9 +16,10 @@ class OcrExtractionRequest:
 
     path: Path
     original_text: str
-    max_tokens: int
+    max_tokens: int | None
     max_pages: int
     language: str
+    read_all_pages: bool = False
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,3 @@ class ExtractionResult:
 
     content: str
     used_vision: bool
-
-    def as_tuple(self) -> tuple[str, bool]:
-        """Return the established renamer-facing extraction contract."""
-        return self.content, self.used_vision

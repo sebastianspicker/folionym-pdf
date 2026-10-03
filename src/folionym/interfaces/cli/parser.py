@@ -1,5 +1,5 @@
 """
-CLI argument parser construction. Used by cli.main(); build_parser() returns the parser.
+CLI argument parser construction. Used by cli.command.main(); build_parser() returns the parser.
 """
 
 from __future__ import annotations
@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 
 from ...extraction.pdf import DEFAULT_MAX_CONTENT_TOKENS
+from ...settings import WORKFLOW_PRESET_CHOICES
 from .parser_sections import (
     add_dirs_and_file_args,
     add_language_case_project_args,
@@ -315,7 +316,10 @@ def _add_llm_connection_args(p: argparse._ActionsContainer) -> None:
         dest="llm_model",
         default=None,
         metavar="MODEL",
-        help="LLM model name for HTTP backend (default: env FOLIONYM_LLM_MODEL or 'default')",
+        help=(
+            "LLM model name for HTTP backend "
+            "(default: env FOLIONYM_LLM_MODEL or the --llm-preset model, qwen2.5:3b for apple-silicon)"
+        ),
     )
     p.add_argument(
         "--llm-timeout",
@@ -414,7 +418,7 @@ def _add_llm_preset_args(p: argparse._ActionsContainer) -> None:
         "--preset",
         dest="preset",
         default=None,
-        choices=["high-confidence-heuristic", "scanned", "fast", "accurate", "batch"],
+        choices=list(WORKFLOW_PRESET_CHOICES),
         help=(
             "Preset: high-confidence-heuristic, scanned, fast (heuristics-first), "
             "accurate (more LLM analysis), or batch (higher workers + persistent cache)."

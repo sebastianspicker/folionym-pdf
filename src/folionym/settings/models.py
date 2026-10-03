@@ -2,14 +2,32 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import MISSING, dataclass, fields
 from pathlib import Path
 from typing import Any
 
-_VALID_DESIRED_CASES = frozenset({"camelCase", "kebabCase", "snakeCase"})
-_VALID_DATE_LOCALES = frozenset({"dmy", "mdy"})
+# Public choice sets: the CLI, TUI, and browser settings derive from these.
+# Tuple order is the order the interactive forms present.
+LANGUAGE_CHOICES: tuple[str, ...] = ("de", "en")
+DESIRED_CASE_CHOICES: tuple[str, ...] = ("kebabCase", "snakeCase", "camelCase")
+DATE_LOCALE_CHOICES: tuple[str, ...] = ("dmy", "mdy")
+WORKFLOW_PRESET_CHOICES: tuple[str, ...] = ("high-confidence-heuristic", "scanned", "fast", "accurate", "batch")
+
+_VALID_DESIRED_CASES = frozenset(DESIRED_CASE_CHOICES)
+_VALID_DATE_LOCALES = frozenset(DATE_LOCALE_CHOICES)
 _VALID_CATEGORY_DISPLAY = frozenset({"specific", "with_parent", "parent_only"})
-_VALID_LANGUAGES = frozenset({"de", "en"})
+_VALID_LANGUAGES = frozenset(LANGUAGE_CHOICES)
+
+# Resource budgets shared with the LLM cache and the PDF vision renderer.
+DEFAULT_VISION_RENDER_DPI = 300
+DEFAULT_VISION_MAX_PIXELS = 4_000_000
+DEFAULT_VISION_MAX_DIMENSION_PIXELS = 4096
+DEFAULT_VISION_MAX_ENCODED_BYTES = 8 * 1024 * 1024
+DEFAULT_CACHE_MAX_MEMORY_ENTRIES = 256
+DEFAULT_CACHE_MAX_MEMORY_BYTES = 16 * 1024 * 1024
+DEFAULT_CACHE_MAX_DISK_ENTRIES = 2048
+DEFAULT_CACHE_MAX_DISK_BYTES = 256 * 1024 * 1024
+DEFAULT_CACHE_TTL_S = 30 * 24 * 60 * 60
 
 
 @dataclass(frozen=True)
@@ -33,6 +51,7 @@ class LLMRuntimeConfig:
     use_single_llm_call: bool = True
     llm_use_chat_api: bool = True
     llm_json_mode: bool = True
+    llm_concurrency: int = 1
 
 
 @dataclass(frozen=True)
@@ -43,6 +62,10 @@ class LLMVisionConfig:
     vision_fallback_min_text_len: int = 50
     vision_model: str | None = None
     vision_first: bool = False
+    vision_render_dpi: int = DEFAULT_VISION_RENDER_DPI
+    vision_max_pixels: int = DEFAULT_VISION_MAX_PIXELS
+    vision_max_dimension_pixels: int = DEFAULT_VISION_MAX_DIMENSION_PIXELS
+    vision_max_encoded_bytes: int = DEFAULT_VISION_MAX_ENCODED_BYTES
 
 
 @dataclass(frozen=True)
@@ -54,6 +77,11 @@ class LLMContentConfig:
     max_content_tokens: int | None = None
     use_cache: bool = True
     cache_dir: str | Path | None = None
+    cache_max_memory_entries: int = DEFAULT_CACHE_MAX_MEMORY_ENTRIES
+    cache_max_memory_bytes: int = DEFAULT_CACHE_MAX_MEMORY_BYTES
+    cache_max_disk_entries: int = DEFAULT_CACHE_MAX_DISK_ENTRIES
+    cache_max_disk_bytes: int = DEFAULT_CACHE_MAX_DISK_BYTES
+    cache_ttl_s: float = DEFAULT_CACHE_TTL_S
 
 
 @dataclass(frozen=True)
@@ -127,6 +155,7 @@ class ExtractionConfig:
     use_ocr: bool = False
     use_structured_fields: bool = True
     use_pdf_metadata_for_date: bool = True
+    full_text_extraction: bool = False
 
 
 @dataclass(frozen=True)
@@ -246,6 +275,36 @@ class RenamerConfig:
     def __post_init__(self) -> None:
         """Validate cross-field invariants after dataclass initialization."""
         _validate_renamer_config(self)
+
+
+_LEAF_CONFIG_CLASSES: tuple[type[Any], ...] = (
+    LLMBackendConfig,
+    LLMRuntimeConfig,
+    LLMVisionConfig,
+    LLMContentConfig,
+    HeuristicScoreConfig,
+    HeuristicCategoryConfig,
+    HeuristicSkipConfig,
+    HeuristicWindowConfig,
+    ExtractionConfig,
+    OutputNamingConfig,
+    OutputTemplateConfig,
+    OutputPathConfig,
+    OutputTraversalConfig,
+    OutputModeConfig,
+    OutputHookConfig,
+    OutputProgressConfig,
+)
+
+
+def flat_field_defaults() -> dict[str, Any]:
+    """Return the built-in default of every flat configuration key, as declared on the grouped dataclasses."""
+    return {
+        field.name: field.default
+        for cls in _LEAF_CONFIG_CLASSES
+        for field in fields(cls)
+        if field.default is not MISSING
+    }
 
 
 def build_config_from_flat_dict(data: dict[str, Any]) -> RenamerConfig:

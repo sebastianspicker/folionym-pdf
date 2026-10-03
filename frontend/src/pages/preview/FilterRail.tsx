@@ -31,14 +31,19 @@ function filterCount(plan: Plan, status: PreviewStatus | "all"): number {
   }
 }
 
-const filterStatuses: Array<PreviewStatus | "all"> = ["all", "ready", "review", "skipped", "failed"];
+const filterStatuses: Array<PreviewStatus | "all"> = [
+  "all",
+  "ready",
+  "review",
+  "skipped",
+  "failed",
+];
 
 export type ProcessingFact = { label: string; value: string };
 
 type FilterRailProps = {
   plan: Plan;
   filter: PreviewStatus | "all";
-  selectedCount: number;
   facts: ProcessingFact[];
   onFilterChange: (filter: PreviewStatus | "all") => void;
   onChangeSource: () => void;
@@ -47,42 +52,34 @@ type FilterRailProps = {
 export function FilterRail({
   plan,
   filter,
-  selectedCount,
   facts,
   onFilterChange,
   onChangeSource,
 }: FilterRailProps) {
-  const skippedFailed = plan.counts.skipped + plan.counts.failed;
-
   return (
     <aside className="filter-rail" aria-label="Filters and selection">
       <section className="rail-block">
-        <h2 className="rail-title">Review set</h2>
-        <p className="rail-lede">Checked rows keep their exact targets. Apply does not recompute names.</p>
-        <dl className="metric-list">
+        <h2 className="rail-title">Scope</h2>
+        <dl className="scope-list">
           <div>
-            <dt>Selected</dt>
-            <dd>{selectedCount}</dd>
+            <dt>{plan.source_kind === "directory" ? "Folder" : "File"}</dt>
+            <dd title={plan.source}>{compactPath(plan.source)}</dd>
           </div>
           <div>
-            <dt>Ready</dt>
-            <dd>{plan.counts.ready}</dd>
-          </div>
-          <div>
-            <dt>Needs review</dt>
-            <dd>{plan.counts.review}</dd>
-          </div>
-          <div>
-            <dt>Skipped / failed</dt>
-            <dd>{skippedFailed}</dd>
+            <dt>Documents</dt>
+            <dd>{plan.counts.all}</dd>
           </div>
         </dl>
       </section>
       <section className="rail-block">
         <h2 className="rail-title" id="filter-heading">
-          Show
+          Status
         </h2>
-        <div className="filter-list" role="tablist" aria-labelledby="filter-heading">
+        <div
+          className="filter-list"
+          role="tablist"
+          aria-labelledby="filter-heading"
+        >
           {filterStatuses.map((status) => (
             <button
               aria-selected={filter === status}

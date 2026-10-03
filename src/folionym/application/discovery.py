@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import fnmatch
 import logging
+import os
 import re
-from collections.abc import Callable
+import string
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..infrastructure.files import is_path_within
 from ..naming.rules import ProcessingRules, load_processing_rules, should_skip_file_by_rules
-from ..rename_ops import is_path_within
 from ..settings import RenamerConfig
 
 logger = logging.getLogger(__name__)
@@ -36,17 +38,27 @@ def _matches_patterns(name: str, include: list[str] | None, exclude: list[str] |
     return not (exclude and any(fnmatch.fnmatchcase(name_lower, pattern.lower()) for pattern in exclude))
 
 
-def _is_visible_pdf(path: Path) -> bool:
-    return path.is_file() and path.suffix.lower() == ".pdf" and not path.name.startswith(".") and not path.is_symlink()
-
-
-def _is_within_max_depth(path: Path, root: Path, max_depth: int) -> bool:
-    if max_depth <= 0:
-        return True
-    try:
-        return max(0, len(path.relative_to(root).parts) - 1) <= max_depth
-    except ValueError:
-        return False
+def _scan_pdf_candidates(directory: Path, opts: PdfCollectionOptions) -> Iterator[Path]:
+    """Prune depth before descending and use DirEntry's cached file-type metadata."""
+    pending = [(directory, 0)]
+    while pending:
+        folder, depth = pending.pop()
+        children: list[tuple[Path, int]] = []
+        try:
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    if entry.is_symlink():
+                        continue
+                    path = Path(entry.path)
+                    if entry.is_dir(follow_symlinks=False):
+                        if opts.recursive and (opts.max_depth <= 0 or depth < opts.max_depth):
+                            children.append((path, depth + 1))
+                    elif not entry.name.startswith(".") and path.suffix.lower() == ".pdf" and entry.is_file():
+                        yield path
+        except OSError:
+            if not opts.recursive:
+                raise
+        pending.extend(reversed(children))
 
 
 def _collect_override_candidates(directory: Path, files_override: list[Path]) -> list[Path]:
@@ -67,27 +79,20 @@ def collect_pdf_files(directory: Path, options: PdfCollectionOptions | None = No
     """Collect configured visible PDFs, rejecting source symlinks and applying filters."""
     opts = options or PdfCollectionOptions()
     if opts.files_override is not None:
-        candidates = _collect_override_candidates(directory, opts.files_override)
-    elif opts.recursive:
-        candidates = [
-            path
-            for path in directory.rglob("*")
-            if _is_visible_pdf(path) and _is_within_max_depth(path, directory, opts.max_depth)
-        ]
+        candidates: list[Path] | Iterator[Path] = _collect_override_candidates(directory, opts.files_override)
     else:
-        candidates = [path for path in directory.iterdir() if _is_visible_pdf(path)]
-    candidates = [
-        path for path in candidates if _matches_patterns(path.name, opts.include_patterns, opts.exclude_patterns)
+        candidates = _scan_pdf_candidates(directory, opts)
+    already_named = re.compile(r"^\d{8}-.+\.[pP][dD][fF]$") if opts.skip_if_already_named else None
+    return [
+        path
+        for path in candidates
+        if _matches_patterns(path.name, opts.include_patterns, opts.exclude_patterns)
+        and (opts.rules is None or not should_skip_file_by_rules(opts.rules, path.name))
+        and (already_named is None or not already_named.match(path.name))
     ]
-    if opts.rules is not None:
-        candidates = [path for path in candidates if not should_skip_file_by_rules(opts.rules, path.name)]
-    if opts.skip_if_already_named:
-        already_named = re.compile(r"^\d{8}-.+\.[pP][dD][fF]$")
-        candidates = [path for path in candidates if not already_named.match(path.name)]
-    return candidates
 
 
-def _resolve_rename_directory(directory: str | Path, *, files_override: list[Path] | None) -> Path:
+def resolve_rename_directory(directory: str | Path, *, files_override: list[Path] | None) -> Path:
     """Validate and resolve the selected path, permitting a non-directory only with file overrides."""
     dir_str = str(directory).strip()
     if not dir_str:
@@ -100,7 +105,7 @@ def _resolve_rename_directory(directory: str | Path, *, files_override: list[Pat
     return path.resolve()
 
 
-def _load_effective_rules(config: RenamerConfig, rules_override: ProcessingRules | None) -> ProcessingRules | None:
+def load_effective_rules(config: RenamerConfig, rules_override: ProcessingRules | None) -> ProcessingRules | None:
     """Use the supplied rules override or load the configured rules file."""
     if rules_override is not None:
         return rules_override
@@ -116,37 +121,16 @@ def _mtime_key(path: Path) -> float:
         return 0.0
 
 
-def _collect_sorted_pdf_files_with(
+def collect_configured_pdf_files(
     path: Path,
     config: RenamerConfig,
     *,
     files_override: list[Path] | None,
     rules: ProcessingRules | None,
-    collect_pdf_files_fn: Callable[..., list[Path]],
 ) -> list[Path]:
-    """Collect configured PDF candidates and sort them by newest modification time."""
-    files = _collect_pdf_files_with_config(
-        path,
-        config,
-        files_override=files_override,
-        rules=rules,
-        collect_pdf_files_fn=collect_pdf_files_fn,
-    )
-    files.sort(key=_mtime_key, reverse=True)
-    return files
-
-
-def _collect_pdf_files_with_config(
-    path: Path,
-    config: RenamerConfig,
-    *,
-    files_override: list[Path] | None,
-    rules: ProcessingRules | None,
-    collect_pdf_files_fn: Callable[..., list[Path]],
-) -> list[Path]:
-    """Translate traversal configuration into collection options and invoke the collector."""
+    """Translate traversal configuration into collection options and collect PDF candidates."""
     traversal = config.output.traversal
-    return collect_pdf_files_fn(
+    return collect_pdf_files(
         path,
         PdfCollectionOptions(
             recursive=traversal.recursive,
@@ -158,3 +142,55 @@ def _collect_pdf_files_with_config(
             rules=rules,
         ),
     )
+
+
+def collect_sorted_pdf_files(
+    path: Path,
+    config: RenamerConfig,
+    *,
+    files_override: list[Path] | None,
+    rules: ProcessingRules | None,
+) -> list[Path]:
+    """Collect configured PDF candidates and sort them by newest modification time."""
+    files = collect_configured_pdf_files(path, config, files_override=files_override, rules=rules)
+    files.sort(key=_mtime_key, reverse=True)
+    return files
+
+
+def count_directory_pdfs(directory: Path) -> int:
+    """Count the PDFs a depth-one Preview of ``directory`` would discover, or zero when unreadable."""
+    try:
+        return sum(1 for _path in _scan_pdf_candidates(directory, PdfCollectionOptions()))
+    except OSError:
+        return 0
+
+
+def list_child_directories(directory: Path) -> list[Path]:
+    """List non-hidden, non-symlink child directories in a stable order.
+
+    Raises ``PermissionError`` when ``directory`` cannot be read.
+    """
+    return sorted(
+        (
+            child
+            for child in directory.iterdir()
+            if child.is_dir() and not child.is_symlink() and not child.name.startswith(".")
+        ),
+        key=lambda child: child.name.casefold(),
+    )
+
+
+def local_filesystem_roots() -> list[Path]:
+    """Return the resolved home directory and filesystem or drive roots that exist, without duplicates."""
+    candidates: list[Path] = [Path.home()]
+    if os.name == "nt":
+        candidates.extend(Path(f"{letter}:\\") for letter in string.ascii_uppercase if Path(f"{letter}:\\").exists())
+    else:
+        candidates.append(Path("/"))
+    unique: dict[Path, None] = {}
+    for root in candidates:
+        try:
+            unique[root.resolve(strict=True)] = None
+        except OSError:
+            continue
+    return list(unique)

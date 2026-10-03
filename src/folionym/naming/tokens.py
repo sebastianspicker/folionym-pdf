@@ -6,7 +6,8 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from ..rename_ops import FILENAME_RESERVED_WIN
+from ..infrastructure.filenames import FILENAME_RESERVED_WIN
+from ..settings import DESIRED_CASE_CHOICES
 
 MAX_NORMALIZED_KEYWORDS = 7
 
@@ -124,7 +125,10 @@ _FILENAME_RESERVED_WIN = frozenset(name.lower() for name in FILENAME_RESERVED_WI
 
 
 def clean_token(text: str) -> str:
-    """Normalize a token for filenames."""
+    """Normalize a token for filenames (lowercased, transliterated, whitespace to underscores).
+
+    Unlike ``sanitize_filename_base`` it also lowercases and transliterates, so the two are not interchangeable.
+    """
     text = text.strip().rstrip(".")
     if not text:
         return "na"
@@ -146,7 +150,7 @@ def clean_token(text: str) -> str:
     return text
 
 
-_VALID_CASES = frozenset({"camelCase", "kebabCase", "snakeCase"})
+_VALID_CASES = frozenset(DESIRED_CASE_CHOICES)
 VALID_CASE_CHOICES: tuple[str, ...] = tuple(sorted(_VALID_CASES))
 
 

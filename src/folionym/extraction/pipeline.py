@@ -4,35 +4,39 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 
+from ..infrastructure.filenames import sanitize_filename_from_llm
 from ..infrastructure.files import reject_source_symlink
 from ..llm.models import VisionCompletionOptions
-from ..llm.prompts import build_vision_filename_prompt
 from ..llm.protocol import LLMClient
-from ..rename_ops import sanitize_filename_from_llm
+from ..settings.environment import ENV_MAX_TOKENS, env_str
 from ..settings.models import RenamerConfig
 from .models import ExtractionFunctions, ExtractionResult, VisionAttempt, VisionExtractionRequest
 from .pdf import (
     DEFAULT_MAX_CONTENT_TOKENS,
-    pdf_first_page_to_image_base64,
     pdf_first_page_to_image_payload,
     pdf_to_text,
     pdf_to_text_with_ocr,
 )
+from .vision import build_vision_filename_prompt
 
 logger = logging.getLogger(__name__)
 
 
 def effective_max_tokens(config: RenamerConfig) -> int:
-    """Max tokens for PDF extraction from config or env (FOLIONYM_MAX_TOKENS)."""
+    """Max tokens for PDF extraction from config or env (FOLIONYM_MAX_TOKENS).
+
+    ``build_config`` already resolves the environment variable; reading it here
+    covers configurations built without it (such as ``RenamerConfig()``).
+    """
     max_tok = config.extraction.max_tokens_for_extraction
     if max_tok is not None and max_tok > 0:
         return max_tok
     try:
-        v = int(os.environ.get("FOLIONYM_MAX_TOKENS", "") or 0)
+        v = int(env_str(ENV_MAX_TOKENS) or 0)
         if v > 0:
             return v
     except ValueError:
@@ -104,6 +108,7 @@ def _extract_primary_content(
                 max_pages=extraction.max_pages_for_extraction or 0,
                 max_tokens=effective_max_tokens(config),
                 language=config.output.naming.language,
+                read_all_pages=extraction.full_text_extraction,
             ),
             "ocr",
         )
@@ -114,31 +119,19 @@ def _extract_primary_content(
             path,
             max_pages=extraction.max_pages_for_extraction or 0,
             max_tokens=effective_max_tokens(config),
+            read_all_pages=extraction.full_text_extraction,
         ),
         "text",
     )
 
 
-def extract_pdf_content(path: Path, config: RenamerConfig) -> tuple[str, bool]:
-    """Extract PDF content using the production text, OCR, and vision adapters."""
-    return extract_pdf_content_with(
-        path,
-        config,
-        extraction_fns=ExtractionFunctions(
-            image_fn=pdf_first_page_to_image_base64,
-            pdf_to_text_fn=pdf_to_text,
-            pdf_to_text_with_ocr_fn=pdf_to_text_with_ocr,
-        ),
-    )
-
-
-def extract_pdf_content_with(
+def extract_pdf_content(
     path: Path,
     config: RenamerConfig,
     *,
-    extraction_fns: ExtractionFunctions | None = None,
     llm_client: LLMClient | None = None,
-) -> tuple[str, bool]:
+    extraction_fns: ExtractionFunctions | None = None,
+) -> ExtractionResult:
     """Extract content using the configured strategy order.
 
     Strategy order:
@@ -146,29 +139,21 @@ def extract_pdf_content_with(
     2. primary text extraction (`text` or `ocr`)
     3. `vision_fallback` when extracted text is too short
 
-    Returns `(content, used_vision)`.
     `used_vision` is `True` when any vision-based extraction path was selected,
-    including both `vision_first` and `vision_fallback`.
+    including both `vision_first` and `vision_fallback`. Source symlinks are
+    rejected before any extraction. Vision strategies require a caller-owned
+    `llm_client`; `extraction_fns` replaces the production adapters in tests.
     """
-    return extract_pdf_content_result_with(
-        path,
-        config,
-        extraction_fns=extraction_fns,
-        llm_client=llm_client,
-    ).as_tuple()
-
-
-def extract_pdf_content_result_with(
-    path: Path,
-    config: RenamerConfig,
-    *,
-    extraction_fns: ExtractionFunctions | None = None,
-    llm_client: LLMClient | None = None,
-) -> ExtractionResult:
-    """Extract content as a typed result while retaining caller-owned LLM clients."""
     reject_source_symlink(path)
+    vision = config.llm.vision
     extraction_fns = extraction_fns or ExtractionFunctions(
-        image_fn=pdf_first_page_to_image_payload,
+        image_fn=partial(
+            pdf_first_page_to_image_payload,
+            dpi=vision.vision_render_dpi,
+            max_pixels=vision.vision_max_pixels,
+            max_dimension_pixels=vision.vision_max_dimension_pixels,
+            max_encoded_bytes=vision.vision_max_encoded_bytes,
+        ),
         pdf_to_text_fn=pdf_to_text,
         pdf_to_text_with_ocr_fn=pdf_to_text_with_ocr,
     )
@@ -194,7 +179,7 @@ def _run_vision_first(
     """Run vision-first when enabled and return its content, client, and attempted state."""
     if not config.llm.vision.vision_first:
         return VisionAttempt(None, client, False)
-    client = _ensure_llm_client(config, client)
+    client = _ensure_llm_client(client)
     _log_extraction_strategy(path, "vision_first", outcome="attempt")
     content = _try_vision_extraction(VisionExtractionRequest(path, config, client, extraction_fns))
     if content:
@@ -230,7 +215,7 @@ def _extract_primary_or_fallback(
     return ExtractionResult(content, used_vision=False)
 
 
-def _ensure_llm_client(config: RenamerConfig, client: LLMClient | None) -> LLMClient:
+def _ensure_llm_client(client: LLMClient | None) -> LLMClient:
     """Require the run-scoped client supplied by the renamer composition root."""
     if client is not None:
         return client
@@ -252,7 +237,7 @@ def _run_vision_fallback(
     content_length: int,
 ) -> str | None:
     """Attempt vision fallback and log its attempt and selection; propagate request failures."""
-    client = _ensure_llm_client(config, client)
+    client = _ensure_llm_client(client)
     _log_vision_fallback(path, config, outcome="attempt", text_length=content_length)
     content = _try_vision_extraction(VisionExtractionRequest(path, config, client, extraction_fns))
     if content:

@@ -50,8 +50,41 @@ class StructuredLogFormatter(logging.Formatter):
             )
 
 
-def setup_logging(*, log_file: str | Path = "error.log", level: int = logging.INFO) -> None:
+def default_log_path() -> str:
+    """Return the per-user default log path, falling back to the working directory if it is not writable."""
+    log_dir = Path.home() / ".local" / "share" / "folionym"
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return str(Path.cwd() / "error.log")
+    return str(log_dir / "error.log")
+
+
+def resolve_log_settings(
+    log_file: str | None = None,
+    *,
+    level_name: str | None = None,
+    verbose: bool = False,
+    quiet: bool = False,
+) -> tuple[str, int]:
+    """Resolve the log path and level from explicit values, FOLIONYM_LOG_FILE/FOLIONYM_LOG_LEVEL, then defaults."""
+    resolved_file = log_file or os.environ.get("FOLIONYM_LOG_FILE") or default_log_path()
+    if verbose:
+        level = logging.DEBUG
+    elif quiet:
+        level = logging.WARNING
+    elif level_name:
+        level = getattr(logging, level_name)
+    else:
+        env_level = os.environ.get("FOLIONYM_LOG_LEVEL", "INFO").upper()
+        level = getattr(logging, env_level, logging.INFO)
+    return (resolved_file, level)
+
+
+def setup_logging(*, log_file: str | Path | None = None, level: int = logging.INFO) -> None:
     """Configure root console and private file logging at the requested level."""
+    if log_file is None:
+        log_file = default_log_path()
     root = logging.getLogger()
     root.setLevel(level)
     formatter = _log_formatter()

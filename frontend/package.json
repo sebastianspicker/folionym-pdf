@@ -8,8 +8,11 @@
   },
   "scripts": {
     "build": "npm run typecheck && vite build",
+    "build:demo": "npm run typecheck && vite build --mode demo && node --input-type=module -e \"import { copyFile, cp } from 'node:fs/promises'; await copyFile('../dist-demo/index.html', '../dist-demo/404.html'); await copyFile('../docs/tour.html', '../dist-demo/tour.html'); await cp('../docs/screenshots', '../dist-demo/screenshots', { recursive: true });\"",
     "dev": "vite",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json --pretty false && tsc --noEmit -p tsconfig.node.json --pretty false"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json --pretty false && tsc --noEmit -p tsconfig.node.json --pretty false",
+    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
+    "test:browser": "tsc --noEmit -p tsconfig.test.json --pretty false && node tests/browser-smoke.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

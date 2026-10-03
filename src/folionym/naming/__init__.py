@@ -1,5 +1,6 @@
-"""Pure document naming internals.
+"""Document naming: heuristics, LLM prompts and analysis, and filename assembly.
 
-Public callers use :mod:`folionym.filename`; this package separates naming
-decisions from application orchestration and HTTP-client ownership.
+Decides what to ask a model and how to combine its answers with deterministic
+heuristics into a filename; :mod:`folionym.llm` owns how the model is reached.
+Public callers use :mod:`folionym.filename`.
 """

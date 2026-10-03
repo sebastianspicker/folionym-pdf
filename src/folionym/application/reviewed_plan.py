@@ -10,21 +10,15 @@ from pathlib import Path
 from threading import Event
 from uuid import uuid4
 
+from ..infrastructure.filenames import sanitize_filename_base
 from ..infrastructure.files import reject_source_symlink
-from ..rename_ops import RenameApplyOptions, sanitize_filename_base
+from ..rename_ops import RenameApplyOptions, apply_single_rename
 from ..settings import RenamerConfig
-from .artifacts import RenameOutputData, RenameSummaryData, _write_export_metadata, _write_summary_json
-from .batch import apply_rename_with_policy
-from .discovery import (
-    _collect_sorted_pdf_files_with,
-    _load_effective_rules,
-    _resolve_rename_directory,
-    collect_pdf_files,
-)
-from .hooks import _make_post_rename_success_callback
+from .artifacts import RenameOutputData, RenameSummaryData, write_export_metadata, write_summary_json
+from .discovery import collect_sorted_pdf_files, load_effective_rules, resolve_rename_directory
+from .hooks import make_post_rename_success_callback
 from .models import (
     ApplyItemResult,
-    ApplyPolicy,
     ApplyReport,
     ApplyStatus,
     FileFingerprint,
@@ -62,7 +56,7 @@ def _source_scope(source: Path) -> tuple[Path, str, list[Path] | None]:
             raise ValueError("Single-file sources must be PDFs.")
         resolved_file = expanded.resolve()
         return (resolved_file.parent, "file", [resolved_file])
-    return (_resolve_rename_directory(expanded, files_override=None), "directory", None)
+    return (resolve_rename_directory(expanded, files_override=None), "directory", None)
 
 
 def _capture_fingerprints(files: Iterable[Path]) -> dict[Path, FileFingerprint | None]:
@@ -131,14 +125,8 @@ def create_preview_plan(
 ) -> PreviewPlan:
     """Process a local source into an immutable structured preview plan."""
     directory, source_kind, files_override = _source_scope(Path(source))
-    rules = _load_effective_rules(config, None)
-    files = _collect_sorted_pdf_files_with(
-        directory,
-        config,
-        files_override=files_override,
-        rules=rules,
-        collect_pdf_files_fn=collect_pdf_files,
-    )
+    rules = load_effective_rules(config, None)
+    files = collect_sorted_pdf_files(directory, config, files_override=files_override, rules=rules)
     fingerprints = _capture_fingerprints(files)
     proposals = produce_proposals(files, config, rules=rules, progress_callback=progress_callback)
     return PreviewPlan(
@@ -173,10 +161,10 @@ def _duplicate_target_ids(items: Iterable[PreviewItem]) -> set[str]:
     return {item_id for ids in by_target.values() if len(ids) > 1 for item_id in ids}
 
 
-def _write_web_outputs(config: RenamerConfig, source: Path, output: RenameOutputData) -> None:
-    """Write configured machine-readable outputs without terminal summary rendering."""
-    _write_export_metadata(config, output)
-    _write_summary_json(
+def _write_reviewed_outputs(config: RenamerConfig, source: Path, output: RenameOutputData) -> None:
+    """Write the export metadata and summary JSON for one applied reviewed plan."""
+    write_export_metadata(config, output)
+    write_summary_json(
         config.output.paths.summary_json_path,
         RenameSummaryData(
             directory=source if source.is_dir() else source.parent,
@@ -224,8 +212,8 @@ def _perform_exact_rename(item: PreviewItem, config: RenamerConfig, output: Rena
             )
         if os.path.lexists(exact_target):
             return _failed_apply_item(item, "The reviewed target already exists.")
-        on_success = _make_post_rename_success_callback(config, item.metadata, output.export_rows)
-        success, target = apply_rename_with_policy(
+        on_success = make_post_rename_success_callback(config, item.metadata, output.export_rows)
+        success, target = apply_single_rename(
             item.source,
             base,
             RenameApplyOptions(
@@ -233,8 +221,8 @@ def _perform_exact_rename(item: PreviewItem, config: RenamerConfig, output: Rena
                 backup_dir=config.output.paths.backup_dir,
                 on_success=on_success,
                 max_filename_chars=config.output.naming.max_filename_chars,
+                exact_target=True,
             ),
-            ApplyPolicy.EXACT_REVIEWED,
         )
         if success:
             return ApplyItemResult(item.id, item.source.name, target.name, ApplyStatus.RENAMED)
@@ -319,8 +307,7 @@ def apply_reviewed_plan(
     selected = frozenset(selected_ids)
     selected_items = _selected_items(plan, selected)
     duplicate_ids = _duplicate_target_ids(selected_items)
-    active_stop_event = stop_event or Event()
-    active_stop_event.clear()
+    active_stop_event = stop_event if stop_event is not None else Event()
     config = _apply_config(plan, active_stop_event)
     output = RenameOutputData()
     results = _apply_plan_items(
@@ -330,7 +317,7 @@ def apply_reviewed_plan(
         (output, duplicate_ids, active_stop_event),
         progress_callback,
     )
-    _write_web_outputs(config, plan.source, output)
+    _write_reviewed_outputs(config, plan.source, output)
     return ApplyReport(
         id=uuid4().hex,
         plan_id=plan.id,

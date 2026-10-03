@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Pagination, PAGE_SIZE } from "../../components/Pagination";
 import { StatusPill } from "../../components";
 import { ArrowRightIcon, DocumentIcon } from "../../icons";
 import type { ApplyItem, ApplyStatus } from "../../types";
 
-const reportFilters: Array<ApplyStatus | "all"> = ["all", "renamed", "unchanged", "failed", "cancelled"];
+const reportFilters: Array<ApplyStatus | "all"> = ["all", "renamed", "skipped", "unchanged", "failed", "cancelled"];
 
 export function ApplyReportLedger({ items }: { items: ApplyItem[] }) {
   const [filter, setFilter] = useState<ApplyStatus | "all">("all");
-  const visibleItems = items.filter((item) => filter === "all" || item.status === filter);
+  const [requestedPage, setPage] = useState(0);
+  const filteredItems = useMemo(() => items.filter((item) => filter === "all" || item.status === filter), [items, filter]);
+  const page = Math.min(requestedPage, Math.max(0, Math.ceil(filteredItems.length / PAGE_SIZE) - 1));
+  const visibleItems = filteredItems.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   return (
     <section className="result-list">
@@ -19,10 +23,12 @@ export function ApplyReportLedger({ items }: { items: ApplyItem[] }) {
         <div className="result-filters">
           {reportFilters.map((status) => (
             <button
+              aria-pressed={filter === status}
               className={filter === status ? "is-active" : ""}
               key={status}
               onClick={() => {
                 setFilter(status);
+                setPage(0);
               }}
               type="button"
             >
@@ -43,6 +49,8 @@ export function ApplyReportLedger({ items }: { items: ApplyItem[] }) {
           </div>
         ))}
       </div>
+      {visibleItems.length === 0 && <p role="status">No matching outcomes.</p>}
+      <Pagination page={page} total={filteredItems.length} onChange={setPage} />
     </section>
   );
 }
