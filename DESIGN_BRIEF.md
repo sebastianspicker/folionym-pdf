@@ -129,7 +129,7 @@ the document-leaf mark.
 
 ## 7. Constraints
 
-- Routes `/`, `/preview`, `/apply` (with demo base `/folionym/`), the
+- Routes `/`, `/preview`, `/apply` (with demo base `/folionym-pdf/`), the
   `/api/v1` contract in `api.ts`, `sessionStorage` keys, `localStorage`
   `folionym.theme`.
 - Tests depend on: `role="option"` rows with `aria-posinset/setsize`,

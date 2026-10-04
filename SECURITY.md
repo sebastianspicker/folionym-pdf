@@ -135,7 +135,7 @@ URL, request payload, document paths, metadata, and response body.
 
 If you discover a security vulnerability, please do not open a public issue.
 Use the repository's
-[private security-advisory form](https://github.com/sebastianspicker/folionym/security/advisories/new)
+[private security-advisory form](https://github.com/sebastianspicker/folionym-pdf/security/advisories/new)
 when it is available to your GitHub account.
 
 If private advisories are unavailable, keep vulnerability details, document

@@ -9,7 +9,7 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(here, "../..");
 const demoDir = join(repoRoot, "dist-demo");
 const outputDir = join(repoRoot, "docs/screenshots");
-const base = "/folionym/";
+const base = "/folionym-pdf/";
 
 const screenshots = [
   { name: "01-source", path: `${base}`, storage: {} },

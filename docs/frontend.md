@@ -21,7 +21,7 @@ supported remote, multi-user, container, or hosted deployment.
 | --- | --- |
 | ![Per-file apply report](screenshots/03-apply.png) | ![Preview in the dark theme](screenshots/04-preview-dark.png) |
 
-The [live demo](https://sebastianspicker.github.io/folionym/) reproduces these
+The [live demo](https://sebastianspicker.github.io/folionym-pdf/) reproduces these
 screens with simulated documents.
 
 ## Reviewed workflow
@@ -86,7 +86,7 @@ service. The production build writes to `src/folionym/web_dist/`.
 
 The repository includes a deterministic static-demo build for GitHub Pages.
 When Pages is enabled for Actions and the Pages workflow has deployed, the demo
-is at `https://sebastianspicker.github.io/folionym/`. It uses no PDF files,
+is at `https://sebastianspicker.github.io/folionym-pdf/`. It uses no PDF files,
 loopback service, or backend API requests: Source, Preview, and Apply work
 against in-browser mock data, and Apply reports simulated outcomes without
 changing files. A `tour.html` page on the same site adds the screenshot tour
@@ -99,7 +99,7 @@ cd frontend
 npm run build:demo
 ```
 
-This writes `dist-demo/` with the project base `/folionym/`, a `404.html`
+This writes `dist-demo/` with the project base `/folionym-pdf/`, a `404.html`
 fallback for route refreshes, and copies the screenshot tour from `docs/`. It
 never writes `src/folionym/web_dist/`. The *Pages demo* workflow validates this
 build on pull requests and is configured to deploy it from `main` or a manually

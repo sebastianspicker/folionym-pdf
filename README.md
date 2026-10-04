@@ -2,9 +2,9 @@
 
 **Rename PDFs from what's actually inside them — locally, with a review step before anything moves.**
 
-[![CI](https://github.com/sebastianspicker/folionym/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastianspicker/folionym/actions/workflows/ci.yml)
-[![Security](https://github.com/sebastianspicker/folionym/actions/workflows/security.yml/badge.svg)](https://github.com/sebastianspicker/folionym/actions/workflows/security.yml)
-[![Pages demo](https://github.com/sebastianspicker/folionym/actions/workflows/pages.yml/badge.svg)](https://github.com/sebastianspicker/folionym/actions/workflows/pages.yml)
+[![CI](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/ci.yml)
+[![Security](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/security.yml/badge.svg)](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/security.yml)
+[![Pages demo](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/pages.yml/badge.svg)](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/pages.yml)
 [![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-3776AB)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-0e6b57)](LICENSE)
 
@@ -13,7 +13,7 @@ deterministic rules and optional local-LLM help, and shows you the result before
 touching the filesystem. You can drive it from the command line, a terminal UI,
 or a browser UI that only listens on your own machine.
 
-**Try it without installing:** [open the interactive demo](https://sebastianspicker.github.io/folionym/)
+**Try it without installing:** [open the interactive demo](https://sebastianspicker.github.io/folionym-pdf/)
 — it runs entirely in your browser on simulated files.
 
 > **Status:** alpha (`0.4.0a1`). Keep backups of important documents and review
@@ -56,7 +56,7 @@ content can leave the machine.
 | [![Per-file apply report](docs/screenshots/03-apply.png)](docs/screenshots/03-apply.png) | [![Preview in the dark theme](docs/screenshots/04-preview-dark.png)](docs/screenshots/04-preview-dark.png) |
 | See exactly what was renamed, skipped, or left unchanged. | A light and dark theme are both included. |
 
-Prefer a hands-on look first? The [static demo](https://sebastianspicker.github.io/folionym/)
+Prefer a hands-on look first? The [static demo](https://sebastianspicker.github.io/folionym-pdf/)
 reproduces these screens with simulated documents and never calls the local
 backend.
 

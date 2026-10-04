@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 export default defineConfig(({ mode }) => {
   const demo = mode === "demo";
   return {
-    base: demo ? "/folionym/" : "/",
+    base: demo ? "/folionym-pdf/" : "/",
     plugins: [react()],
     build: {
       outDir: demo ? "../dist-demo" : "../src/folionym/web_dist",
