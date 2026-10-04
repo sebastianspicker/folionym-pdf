@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
@@ -18,7 +19,6 @@ from ...application.discovery import count_directory_pdfs, list_child_directorie
 from ...application.models import PreviewPlan
 from ...application.privacy import external_llm_endpoint
 from ..ui_settings import build_config_from_ui_settings, load_ui_settings, merged_ui_settings
-from .cli import default_static_dir
 from .payloads import item_payload, plan_payload, report_payload
 from .runtime import RunConflictError, RunEvent, RunRegistry
 from .schema import (
@@ -45,6 +45,11 @@ _SECURITY_HEADERS = {
 }
 
 
+def default_static_dir() -> Path:
+    """Return the packaged Vite build directory."""
+    return Path(__file__).parents[2] / "web_dist"
+
+
 def _host_name(host_header: str) -> str:
     """Return a normalized hostname from the HTTP Host header."""
     if host_header.startswith("["):
@@ -52,11 +57,23 @@ def _host_name(host_header: str) -> str:
     return host_header.rsplit(":", 1)[0].lower()
 
 
+def _confined_path(path_value: str) -> Path:
+    """Normalize a client-supplied path and require it to sit under a local filesystem root."""
+    normalized = os.path.normpath(os.path.expanduser(path_value))
+    for root in local_filesystem_roots():
+        root_text = os.path.normpath(str(root))
+        if normalized == root_text:
+            return Path(root_text)
+        if normalized.startswith(root_text.rstrip(os.sep) + os.sep):
+            return Path(normalized)
+    raise HTTPException(403, "Path is outside the local filesystem roots.")
+
+
 def _resolve_directory(path_value: str) -> Path:
     """Resolve one absolute directory path to a readable filesystem location."""
-    path = Path(path_value).expanduser()
-    if not path.is_absolute():
+    if not os.path.isabs(os.path.expanduser(path_value)):
         raise HTTPException(400, "Directory paths must be absolute.")
+    path = _confined_path(path_value)
     try:
         resolved = path.resolve(strict=True)
     except FileNotFoundError as exc:
@@ -203,7 +220,7 @@ def _prepare_preview_settings(request: PreviewRequest, acknowledged: set[str]) -
         acknowledged.add(endpoint)
     settings = request.settings.model_dump()
     settings["acknowledged_external_endpoint"] = ""
-    source = str(Path(request.path).expanduser())
+    source = str(_confined_path(request.path))
     if request.source_kind == "file":
         settings["single_file"] = source
         settings["directory"] = str(Path(source).parent)
@@ -292,7 +309,7 @@ def _register_source_routes(app: FastAPI, registry: RunRegistry) -> None:
         """Validate and enqueue one structured Preview run."""
         settings = _prepare_preview_settings(payload, request_acknowledgements)
         try:
-            run_id = registry.start_preview(Path(payload.path).expanduser(), settings)
+            run_id = registry.start_preview(_confined_path(payload.path), settings)
         except RunConflictError as exc:
             raise HTTPException(409, str(exc)) from exc
         except (FileNotFoundError, NotADirectoryError, ValueError) as exc:

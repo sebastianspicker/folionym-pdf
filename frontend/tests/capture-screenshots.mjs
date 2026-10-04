@@ -190,13 +190,17 @@ async function main() {
       });
       await cdp.send("Page.navigate", { url: `${origin}${base}` });
       await settle(cdp.send);
-      const storage = JSON.stringify(shot.storage);
-      await cdp.send("Runtime.evaluate", {
-        expression: `(() => { const s = ${storage}; sessionStorage.clear();
+      const { result: globalScope } = await cdp.send("Runtime.evaluate", { expression: "globalThis" });
+      await cdp.send("Runtime.callFunctionOn", {
+        objectId: globalScope.objectId,
+        functionDeclaration: `function (s) {
+          sessionStorage.clear();
           for (const [k, v] of Object.entries(s)) {
             if (k === 'theme') localStorage.setItem('folionym.theme', v);
             else sessionStorage.setItem('folionym.' + k, v);
-          } })()`,
+          }
+        }`,
+        arguments: [{ value: shot.storage }],
       });
       await cdp.send("Page.navigate", { url: `${origin}${shot.path}` });
       await settle(cdp.send);
