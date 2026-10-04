@@ -49,7 +49,7 @@ from ..ui_settings import (
 from ..ui_settings import (
     save_ui_settings as _save_settings,
 )
-from .assets import _PRESETS, ERROR_COLOR, FOLIONYM_THEME, PREVIEW_COLOR, SUCCESS_COLOR, WARNING_COLOR
+from .assets import ERROR_COLOR, FOLIONYM_THEME, PRESET_OPTIONS, PREVIEW_COLOR, SUCCESS_COLOR, WARNING_COLOR
 from .confirmation import ConfirmActionScreen
 from .forms import compose_advanced, compose_basic, compose_run
 from .operations import process_single_file
@@ -147,7 +147,7 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
                 yield Button("3  Review & rename\nPreview & apply", id="nav-run", classes="workflow-nav")
             with TabbedContent(initial="basic", id="workflow-tabs"):
                 with TabPane("1  Setup", id="basic"):
-                    yield from compose_basic(self._settings, _PRESETS)
+                    yield from compose_basic(self._settings, PRESET_OPTIONS)
                 with TabPane("2  Fine-tune", id="advanced"):
                     yield from compose_advanced(self._settings)
                 with TabPane("3  Review & rename", id="run"):

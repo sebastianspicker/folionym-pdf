@@ -144,7 +144,6 @@ def write_document_metadata(pdf_path: Path, title: str) -> None:
         finally:
             doc.close()
         _replace_nonempty_temp_pdf(temp_pdf, pdf_path, source_mode)
-        temp_pdf = None
     except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
         _cleanup_temp_pdf(temp_pdf)
         logger.warning("Could not write PDF metadata for %s: %s", pdf_path, exc)

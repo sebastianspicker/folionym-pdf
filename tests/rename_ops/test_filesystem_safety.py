@@ -187,15 +187,25 @@ def test_copy_fallback_can_close_windows_source_before_unlink(tmp_path: Path) ->
     destination = tmp_path / "invoice.pdf"
     source.write_bytes(b"reviewed bytes")
     source_fd = os.open(source, os.O_RDONLY)
+    closed = False
 
-    filesystem._copy_with_pinned_source(
-        source,
-        destination,
-        source_fd,
-        before_unlink=lambda: os.close(source_fd),
-        expected_identity=None,
-        directory_fd=None,
-    )
+    def close_source() -> None:
+        nonlocal closed
+        os.close(source_fd)
+        closed = True
+
+    try:
+        filesystem._copy_with_pinned_source(
+            source,
+            destination,
+            source_fd,
+            before_unlink=close_source,
+            expected_identity=None,
+            directory_fd=None,
+        )
+    finally:
+        if not closed:
+            os.close(source_fd)
 
     assert not source.exists()
     assert destination.read_bytes() == b"reviewed bytes"

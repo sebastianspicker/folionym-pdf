@@ -57,7 +57,7 @@ class ThumbnailCache:
                 self._entries.pop(key)
                 self._bytes -= len(data)
         while self._bytes > self._max_bytes or len(self._entries) > self._max_entries:
-            _key, (_created, data) = self._entries.popitem(last=False)
+            _created, data = self._entries.popitem(last=False)[1]
             self._bytes -= len(data)
 
     @staticmethod

@@ -70,7 +70,10 @@ def _write_backup_with_directory_fd(
             fd = _open_exclusive_target(candidate_name, mode=_OWNER_ONLY_FILE_MODE, dir_fd=directory_fd)
         except FileExistsError:
             continue
-        _write_reserved_backup(file_path, backup_path, candidate_name, directory_fd, fd, source_fd=source_fd)
+        try:
+            _write_reserved_backup(file_path, backup_path, candidate_name, directory_fd, fd, source_fd=source_fd)
+        finally:
+            os.close(fd)
         return
     raise OSError(errno.EEXIST, f"Could not create unique path for backup after 10000 attempts: {backup_path}")
 
@@ -99,8 +102,6 @@ def _write_reserved_backup(  # noqa: PLR0913 - reservation identity and descript
         if identity is not None:
             _cleanup_reserved_directory_entry(candidate_name, directory_fd, identity)
         raise
-    finally:
-        os.close(fd)
 
 
 def _write_backup_by_path(file_path: Path, backup_path: Path, *, source_fd: int | None = None) -> None:
@@ -111,7 +112,10 @@ def _write_backup_by_path(file_path: Path, backup_path: Path, *, source_fd: int 
             fd = _open_exclusive_target(candidate, mode=_OWNER_ONLY_FILE_MODE)
         except FileExistsError:
             continue
-        _copy_reserved_backup_by_path(file_path, candidate, fd, source_fd=source_fd)
+        try:
+            _copy_reserved_backup_by_path(file_path, candidate, fd, source_fd=source_fd)
+        finally:
+            os.close(fd)
         return
     raise OSError(errno.EEXIST, f"Could not create unique path for backup after 10000 attempts: {backup_path}")
 
@@ -144,5 +148,3 @@ def _copy_reserved_backup_by_path(
         if identity is not None:
             _cleanup_reserved_target(candidate, identity)
         raise
-    finally:
-        os.close(fd)

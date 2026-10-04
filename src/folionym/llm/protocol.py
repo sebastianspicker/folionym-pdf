@@ -16,10 +16,12 @@ class LLMClient(Protocol):
     """Contract implemented by text and vision completion clients."""
 
     @property
-    def model(self) -> str: ...
+    def model(self) -> str:
+        """Return the configured model name."""
 
     @property
-    def base_url(self) -> str: ...
+    def base_url(self) -> str:
+        """Return the endpoint base URL."""
 
     def complete(
         self,
@@ -28,11 +30,14 @@ class LLMClient(Protocol):
         temperature: float = 0.0,
         max_tokens: int | None = None,
         response_format: dict[str, str] | None = None,
-    ) -> str: ...
+    ) -> str:
+        """Return the model completion for a text prompt."""
 
-    def complete_vision(self, image_b64: str, prompt: str, options: VisionCompletionOptions | None = None) -> str: ...
+    def complete_vision(self, image_b64: str, prompt: str, options: VisionCompletionOptions | None = None) -> str:
+        """Return the model completion for a base64-encoded image and prompt."""
 
-    def close(self) -> None: ...
+    def close(self) -> None:
+        """Release any held client resources."""
 
 
 def _raise_if_cancelled(stop_event: object | None) -> None:

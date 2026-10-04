@@ -8,7 +8,7 @@ from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal, ScrollableContainer, Vertical
 from textual.widgets import Button, Checkbox, DataTable, Input, Label, ProgressBar, RichLog, Select, Static
 
-from .assets import _CASES, _DATE_FORMATS, _LANGUAGES
+from .assets import CASE_OPTIONS, DATE_FORMAT_OPTIONS, LANGUAGE_OPTIONS
 
 
 def _text_input_row(
@@ -51,13 +51,13 @@ def _compose_naming_options(settings: dict[str, object], presets: Sequence[tuple
     yield Static("These values shape the proposed filename; Preview never changes files.", classes="section-note")
     with Horizontal(classes="field-row"):
         yield Label("Language:", classes="field-label")
-        yield Select(_LANGUAGES, id="language", value=str(settings.get("language", "de")))
+        yield Select(LANGUAGE_OPTIONS, id="language", value=str(settings.get("language", "de")))
     with Horizontal(classes="field-row"):
         yield Label("Letter case:", classes="field-label")
-        yield Select(_CASES, id="case", value=str(settings.get("case", "kebabCase")))
+        yield Select(CASE_OPTIONS, id="case", value=str(settings.get("case", "kebabCase")))
     with Horizontal(classes="field-row"):
         yield Label("Date format:", classes="field-label")
-        yield Select(_DATE_FORMATS, id="date_format", value=str(settings.get("date_format", "dmy")))
+        yield Select(DATE_FORMAT_OPTIONS, id="date_format", value=str(settings.get("date_format", "dmy")))
     with Horizontal(classes="field-row"):
         yield Label("Preset:", classes="field-label")
         yield Select(presets, id="preset", value=str(settings.get("preset", "")))

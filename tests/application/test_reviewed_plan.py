@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-import folionym.application.reviewed_plan as reviewed_plan
+from folionym.application import reviewed_plan
 from folionym.application.models import Proposal
 from folionym.application.reviewed_plan import ApplyStatus, apply_reviewed_plan, create_preview_plan
 from folionym.config import build_config

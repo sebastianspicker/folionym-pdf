@@ -151,7 +151,6 @@ def clean_token(text: str) -> str:
 
 
 _VALID_CASES = frozenset(DESIRED_CASE_CHOICES)
-VALID_CASE_CHOICES: tuple[str, ...] = tuple(sorted(_VALID_CASES))
 
 
 @dataclass(frozen=True)

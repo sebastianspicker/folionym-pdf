@@ -13,10 +13,10 @@ ERROR_COLOR = "#B42318"
 
 _LANGUAGE_LABELS = {"de": "German (de)", "en": "English (en)"}
 _DATE_FORMAT_LABELS = {"dmy": "Day-Month-Year (dmy)", "mdy": "Month-Day-Year (mdy)"}
-_LANGUAGES = [(_LANGUAGE_LABELS[code], code) for code in LANGUAGE_CHOICES]
-_CASES = [(case, case) for case in DESIRED_CASE_CHOICES]
-_DATE_FORMATS = [(_DATE_FORMAT_LABELS[code], code) for code in DATE_LOCALE_CHOICES]
-_PRESETS = [("(none)", ""), *((preset, preset) for preset in WORKFLOW_PRESET_CHOICES)]
+LANGUAGE_OPTIONS = [(_LANGUAGE_LABELS[code], code) for code in LANGUAGE_CHOICES]
+CASE_OPTIONS = [(case, case) for case in DESIRED_CASE_CHOICES]
+DATE_FORMAT_OPTIONS = [(_DATE_FORMAT_LABELS[code], code) for code in DATE_LOCALE_CHOICES]
+PRESET_OPTIONS = [("(none)", ""), *((preset, preset) for preset in WORKFLOW_PRESET_CHOICES)]
 
 FOLIONYM_THEME = Theme(
     name="folionym-ledger",

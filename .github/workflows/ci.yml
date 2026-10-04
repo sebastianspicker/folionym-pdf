@@ -51,6 +51,11 @@ jobs:
           cd frontend
           npm ci
 
+      - name: Allow the Chromium sandbox on Ubuntu 24.04
+        # Ubuntu 23.10+ restricts unprivileged user namespaces through AppArmor, which
+        # stops Chromium's sandbox from starting. Relax it so the smoke runs sandboxed.
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: CI gates (browser smoke, release check, bundle freshness)
         run: |
           set -euo pipefail

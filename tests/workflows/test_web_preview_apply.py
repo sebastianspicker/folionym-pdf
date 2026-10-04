@@ -47,7 +47,7 @@ def _wait_for_run(api: ApiRequest, app: Any, run_id: str) -> dict[str, Any]:
         if snapshot["state"] in {"completed", "failed", "cancelled"}:
             return snapshot
         time.sleep(0.05)
-    pytest.fail(f"run {run_id} did not finish")
+    raise AssertionError(f"run {run_id} did not finish")
 
 
 def test_preview_review_apply_and_report_rename_files_on_disk(api: ApiRequest, app: Any, pdf_dir: Path) -> None:

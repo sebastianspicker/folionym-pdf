@@ -41,10 +41,14 @@ def test_check_architecture_resolves_relative_imports(tmp_path: Path) -> None:
     _write(package_root, "llm/deep/client.py", "from ...application import Proposal\n")
 
     assert check_architecture(package_root) == [
-        "src/folionym/infrastructure/files.py:1: architecture violation: "
-        "infrastructure cannot import settings (found 'folionym.settings')",
-        "src/folionym/llm/deep/client.py:1: architecture violation: "
-        "llm cannot import application (found 'folionym.application')",
+        (
+            "src/folionym/infrastructure/files.py:1: architecture violation: "
+            "infrastructure cannot import settings (found 'folionym.settings')"
+        ),
+        (
+            "src/folionym/llm/deep/client.py:1: architecture violation: "
+            "llm cannot import application (found 'folionym.application')"
+        ),
     ]
 
 
@@ -107,10 +111,14 @@ def test_check_architecture_rejects_forbidden_external_libraries(tmp_path: Path)
     _write(package_root, "interfaces/cli/terminal.py", "from textual.app import App\n")
 
     assert check_architecture(package_root) == [
-        "src/folionym/application/models.py:1: architecture violation: "
-        "application cannot import fastapi (found 'fastapi')",
-        "src/folionym/interfaces/cli/terminal.py:1: architecture violation: "
-        "interfaces.cli cannot import textual (found 'textual.app')",
+        (
+            "src/folionym/application/models.py:1: architecture violation: "
+            "application cannot import fastapi (found 'fastapi')"
+        ),
+        (
+            "src/folionym/interfaces/cli/terminal.py:1: architecture violation: "
+            "interfaces.cli cannot import textual (found 'textual.app')"
+        ),
         "src/folionym/llm/parser.py:1: architecture violation: llm cannot import requests (found 'requests')",
         "src/folionym/naming/service.py:1: architecture violation: naming cannot import requests (found 'requests')",
     ]
@@ -133,12 +141,18 @@ def test_check_architecture_rejects_modules_with_an_unknown_owner(tmp_path: Path
     _write(package_root, "interfaces/gui/window.py")
 
     assert check_architecture(package_root) == [
-        "src/folionym/interfaces/extra.py:1: architecture violation: "
-        "unknown owner for module folionym.interfaces.extra — add it to ALLOWED_DEPENDENCIES",
-        "src/folionym/interfaces/gui/window.py:1: architecture violation: "
-        "unknown owner for module folionym.interfaces.gui.window — add it to ALLOWED_DEPENDENCIES",
-        "src/folionym/newpkg/service.py:1: architecture violation: "
-        "unknown owner for module folionym.newpkg.service — add it to ALLOWED_DEPENDENCIES",
+        (
+            "src/folionym/interfaces/extra.py:1: architecture violation: "
+            "unknown owner for module folionym.interfaces.extra — add it to ALLOWED_DEPENDENCIES"
+        ),
+        (
+            "src/folionym/interfaces/gui/window.py:1: architecture violation: "
+            "unknown owner for module folionym.interfaces.gui.window — add it to ALLOWED_DEPENDENCIES"
+        ),
+        (
+            "src/folionym/newpkg/service.py:1: architecture violation: "
+            "unknown owner for module folionym.newpkg.service — add it to ALLOWED_DEPENDENCIES"
+        ),
     ]
 
 
@@ -160,10 +174,14 @@ def test_check_architecture_restricts_pydantic_and_yaml(tmp_path: Path) -> None:
     _write(package_root, "interfaces/cli/other.py", "import yaml\n")
 
     assert check_architecture(package_root) == [
-        "src/folionym/application/models.py:1: architecture violation: "
-        "application cannot import pydantic (found 'pydantic')",
-        "src/folionym/interfaces/cli/other.py:1: architecture violation: "
-        "interfaces.cli cannot import yaml (found 'yaml')",
+        (
+            "src/folionym/application/models.py:1: architecture violation: "
+            "application cannot import pydantic (found 'pydantic')"
+        ),
+        (
+            "src/folionym/interfaces/cli/other.py:1: architecture violation: "
+            "interfaces.cli cannot import yaml (found 'yaml')"
+        ),
     ]
 
 

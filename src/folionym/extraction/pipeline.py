@@ -37,11 +37,9 @@ def effective_max_tokens(config: RenamerConfig) -> int:
         return max_tok
     try:
         v = int(env_str(ENV_MAX_TOKENS) or 0)
-        if v > 0:
-            return v
     except ValueError:
-        pass
-    return DEFAULT_MAX_CONTENT_TOKENS
+        return DEFAULT_MAX_CONTENT_TOKENS
+    return v if v > 0 else DEFAULT_MAX_CONTENT_TOKENS
 
 
 def _try_vision_extraction(request: VisionExtractionRequest) -> str | None:

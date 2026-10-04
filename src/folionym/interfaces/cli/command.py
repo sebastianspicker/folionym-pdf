@@ -25,8 +25,7 @@ from ...infrastructure.http import HttpRequestError, HttpTimeoutError
 from ...infrastructure.logging import resolve_log_settings, setup_logging
 from ...infrastructure.resources import data_path
 from ...naming.scoring import load_heuristic_rules
-from ...naming.tokens import VALID_CASE_CHOICES
-from ...settings import RenamerConfig, build_config
+from ...settings import DESIRED_CASE_CHOICES, RenamerConfig, build_config
 from .config import ConfigLoadError, load_config_file, load_override_category_map
 from .parser import build_parser
 from .runtime import read_prompt_value, resolve_dirs
@@ -357,7 +356,7 @@ def _resolved_config_prompts(args: argparse.Namespace, file_defaults: dict[str, 
             default="kebabCase",
             prompt=OptionPromptSpec(
                 choice_prompt="Desired case format (camelCase, kebabCase, snakeCase, default: kebabCase): ",
-                choices=list(VALID_CASE_CHOICES),
+                choices=sorted(DESIRED_CASE_CHOICES),
                 choice_normalize=str.lower,
             ),
         ),

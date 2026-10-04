@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from ...naming.tokens import VALID_CASE_CHOICES
+from ...settings import DESIRED_CASE_CHOICES
 
 
 def add_dirs_and_file_args(p: argparse._ActionsContainer) -> None:
@@ -152,7 +152,7 @@ def add_language_case_project_args(p: argparse._ActionsContainer) -> None:
         "--case",
         dest="desired_case",
         default=None,
-        choices=list(VALID_CASE_CHOICES),
+        choices=sorted(DESIRED_CASE_CHOICES),
         help="Filename case style (default: kebabCase).",
     )
     p.add_argument("--project", default=None, help="Project prefix in generated filenames.")

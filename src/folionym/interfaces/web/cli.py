@@ -7,12 +7,6 @@ import socket
 import threading
 import time
 import webbrowser
-from pathlib import Path
-
-
-def default_static_dir() -> Path:
-    """Return the packaged Vite build directory."""
-    return Path(__file__).parents[2] / "web_dist"
 
 
 def _open_browser_when_ready(url: str, host: str, port: int) -> None:
@@ -40,7 +34,7 @@ def main(argv: list[str] | None = None) -> None:
     except ImportError as exc:
         raise SystemExit("Install the browser frontend with: pip install 'folionym[web]'") from exc
 
-    from .app import create_app
+    from .app import create_app, default_static_dir
 
     static_dir = default_static_dir()
     if not (static_dir / "index.html").is_file():

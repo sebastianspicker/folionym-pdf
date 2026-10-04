@@ -9,7 +9,7 @@ from urllib.parse import SplitResult, urlsplit
 
 import requests
 
-_URL_UNSAFE_CHARACTER_RE = re.compile(r"[\x00-\x20\x7f\\\\]")
+_URL_UNSAFE_CHARACTER_RE = re.compile(r"[\x00-\x20\x7f\\]")
 _HOST_LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", re.IGNORECASE)
 
 HttpRequestError = requests.RequestException

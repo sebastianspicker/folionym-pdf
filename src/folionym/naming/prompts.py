@@ -40,14 +40,18 @@ PROMPT_STRINGS: dict[str, dict[str, Any]] = {
         ),
         "analysis_examples_heading": "Beispiele:",
         "analysis_examples": [
-            '1. Text: "Rechnung Nr. INV-2025-0042 der Muster GmbH über 249,90 EUR vom 15.03.2025."\n'
-            '   JSON: {"summary":"Rechnung der Muster GmbH über 249,90 EUR vom 15.03.2025.",'
-            '"keywords":["Rechnung","Muster GmbH","INV-2025-0042","249,90 EUR","15.03.2025"],'
-            '"category":"invoice"}',
-            '2. Text: "Gehaltsabrechnung März 2025 für Erika Mustermann, Nettoauszahlung 2.845,12 EUR."\n'
-            '   JSON: {"summary":"Gehaltsabrechnung für März 2025 mit einer Nettoauszahlung von 2.845,12 EUR.",'
-            '"keywords":["Gehaltsabrechnung","März 2025","Nettoauszahlung","2.845,12 EUR","Erika Mustermann"],'
-            '"category":"payslip"}',
+            (
+                '1. Text: "Rechnung Nr. INV-2025-0042 der Muster GmbH über 249,90 EUR vom 15.03.2025."\n'
+                '   JSON: {"summary":"Rechnung der Muster GmbH über 249,90 EUR vom 15.03.2025.",'
+                '"keywords":["Rechnung","Muster GmbH","INV-2025-0042","249,90 EUR","15.03.2025"],'
+                '"category":"invoice"}'
+            ),
+            (
+                '2. Text: "Gehaltsabrechnung März 2025 für Erika Mustermann, Nettoauszahlung 2.845,12 EUR."\n'
+                '   JSON: {"summary":"Gehaltsabrechnung für März 2025 mit einer Nettoauszahlung von 2.845,12 EUR.",'
+                '"keywords":["Gehaltsabrechnung","März 2025","Nettoauszahlung","2.845,12 EUR","Erika Mustermann"],'
+                '"category":"payslip"}'
+            ),
         ],
         "analysis_rules_heading": "Regeln:",
         "analysis_summary_rule": "summary: 1-2 präzise Sätze, die den Dokumentinhalt und -typ beschreiben",
@@ -98,14 +102,18 @@ PROMPT_STRINGS: dict[str, dict[str, Any]] = {
         ),
         "analysis_examples_heading": "Examples:",
         "analysis_examples": [
-            '1. Text: "Invoice INV-2025-0042 from Sample GmbH for EUR 249.90 dated 2025-03-15."\n'
-            '   JSON: {"summary":"Invoice from Sample GmbH for EUR 249.90 dated 2025-03-15.",'
-            '"keywords":["invoice","Sample GmbH","INV-2025-0042","EUR 249.90","2025-03-15"],'
-            '"category":"invoice"}',
-            '2. Text: "Payslip for March 2025 for Erika Mustermann, net pay EUR 2,845.12."\n'
-            '   JSON: {"summary":"Payslip for March 2025 with net pay of EUR 2,845.12.",'
-            '"keywords":["payslip","March 2025","net pay","EUR 2,845.12","Erika Mustermann"],'
-            '"category":"payslip"}',
+            (
+                '1. Text: "Invoice INV-2025-0042 from Sample GmbH for EUR 249.90 dated 2025-03-15."\n'
+                '   JSON: {"summary":"Invoice from Sample GmbH for EUR 249.90 dated 2025-03-15.",'
+                '"keywords":["invoice","Sample GmbH","INV-2025-0042","EUR 249.90","2025-03-15"],'
+                '"category":"invoice"}'
+            ),
+            (
+                '2. Text: "Payslip for March 2025 for Erika Mustermann, net pay EUR 2,845.12."\n'
+                '   JSON: {"summary":"Payslip for March 2025 with net pay of EUR 2,845.12.",'
+                '"keywords":["payslip","March 2025","net pay","EUR 2,845.12","Erika Mustermann"],'
+                '"category":"payslip"}'
+            ),
         ],
         "analysis_rules_heading": "Rules:",
         "analysis_summary_rule": "summary: 1-2 precise sentences describing the document content and type",
@@ -367,8 +375,10 @@ def category_prompts(
     )
     if language == "de":
         prompt_templates = [
-            "Bestimme eine sinnvolle Kategorie als reines JSON.\n"
-            'Gib nur: {"category":"..."}\n\nKeine weiteren Erklärungen. Text:\n',
+            (
+                "Bestimme eine sinnvolle Kategorie als reines JSON.\n"
+                'Gib nur: {"category":"..."}\n\nKeine weiteren Erklärungen. Text:\n'
+            ),
             'Bitte nur {"category":"..."} - ohne Zusätze:\n',
         ]
         return [t + content for t in prompt_templates]
