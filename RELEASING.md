@@ -53,8 +53,7 @@ their public contents, installs the wheel in a disposable environment, and
 checks all four console entry-point mappings.
 
 The alpha requires CPython 3.14 or later; release verification uses exact CPython
-3.14.6. Linux runs the complete release gate, while macOS and Windows run
-targeted smoke checks. Do not broaden the public support claim from local results
+3.14.6. Linux runs the complete release gate. Do not broaden the public support claim from local results
 alone.
 
 These checks validate the proposed candidate. Do not retain or publish their

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import fnmatch
 import logging
 import os
@@ -38,16 +39,26 @@ def _matches_patterns(name: str, include: list[str] | None, exclude: list[str] |
     return not (exclude and any(fnmatch.fnmatchcase(name_lower, pattern.lower()) for pattern in exclude))
 
 
+def _confined_scan_path(base_real: str, folder: Path) -> Path:
+    """Return the folder resolved inside the scan root, or fail with EACCES."""
+    resolved = os.path.realpath(os.path.join(base_real, str(folder)))
+    if not (resolved == base_real or resolved.startswith(base_real.rstrip(os.sep) + os.sep)):
+        raise OSError(errno.EACCES, "Scan path is outside the selected directory", str(folder))
+    return Path(resolved)
+
+
 def _scan_pdf_candidates(directory: Path, opts: PdfCollectionOptions) -> Iterator[Path]:
     """Prune depth before descending and use DirEntry's cached file-type metadata."""
+    base_real = os.path.realpath(directory)
     pending = [(directory, 0)]
     while pending:
         folder, depth = pending.pop()
         children: list[tuple[Path, int]] = []
         directory_fd: int | None = None
         try:
-            directory_fd = open_directory_no_follow(folder)
-            scan_target: int | Path = directory_fd if os.name != "nt" else folder
+            safe_folder = _confined_scan_path(base_real, folder)
+            directory_fd = open_directory_no_follow(safe_folder)
+            scan_target: int | Path = directory_fd if os.name != "nt" else safe_folder
             with os.scandir(scan_target) as entries:
                 for entry in entries:
                     if entry.is_symlink():

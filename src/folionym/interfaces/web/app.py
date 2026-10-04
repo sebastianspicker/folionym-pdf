@@ -70,17 +70,24 @@ def _confined_path(path_value: str) -> Path:
 
 
 def _resolve_directory(path_value: str) -> Path:
-    """Resolve one absolute directory path to a readable filesystem location."""
-    if not os.path.isabs(os.path.expanduser(path_value)):
+    """Resolve one absolute directory path to a readable filesystem location inside a local root."""
+    expanded = os.path.expanduser(path_value)
+    if not os.path.isabs(expanded):
         raise HTTPException(400, "Directory paths must be absolute.")
-    path = _confined_path(path_value)
-    try:
-        resolved = path.resolve(strict=True)
-    except FileNotFoundError as exc:
-        raise HTTPException(404, "Directory does not exist.") from exc
-    if not resolved.is_dir():
+    candidate: str | None = None
+    for root in local_filesystem_roots():
+        base_real = os.path.realpath(str(root))
+        resolved = os.path.realpath(os.path.join(base_real, expanded))
+        if resolved == base_real or resolved.startswith(base_real.rstrip(os.sep) + os.sep):
+            candidate = resolved
+            break
+    if candidate is None:
+        raise HTTPException(403, "Path is outside the local filesystem roots.")
+    if not os.path.exists(candidate):
+        raise HTTPException(404, "Directory does not exist.")
+    if not os.path.isdir(candidate):
         raise HTTPException(400, "Path is not a directory.")
-    return resolved
+    return Path(candidate)
 
 
 def _directory_listing(path_value: str, *, include_counts: bool = True) -> DirectoryListing:

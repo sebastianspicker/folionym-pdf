@@ -138,8 +138,6 @@ Then, from a second terminal, work in `frontend/`:
 
 ```bash
 npm run typecheck
-npm test
-npm run test:browser
 npm run dev
 ```
 
@@ -153,10 +151,3 @@ make release-check
 
 The release gate verifies the packaged `web_dist` asset through an isolated
 installed-wheel check.
-
-`npm test` uses Node's test runner and the installed TypeScript compiler.
-`npm run test:browser` runs real React hooks and components in an installed
-Chromium browser with a disposable profile; it downloads no browser or test
-framework. Set `FOLIONYM_BROWSER` to the executable if it is not discovered.
-`node tests/capture-screenshots.mjs` regenerates the tour images in
-`docs/screenshots/` from the demo build.

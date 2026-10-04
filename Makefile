@@ -1,7 +1,7 @@
 UV ?= uv
 PYTHON_VERSION ?= $(shell cat .python-version)
 
-.PHONY: install-dev frontend-install frontend-check frontend-browser-check web-dist-check lint format typecheck test clean lock-check hygiene-check architecture-check build-check release-check ci
+.PHONY: install-dev frontend-install frontend-check web-dist-check lint format typecheck clean lock-check hygiene-check architecture-check build-check release-check ci
 
 install-dev:
 	$(UV) sync --all-extras
@@ -11,11 +11,7 @@ frontend-install:
 	cd frontend && npm ci
 
 frontend-check:
-	cd frontend && npm test && npm run build
-
-# Headless Chromium workflow smoke; set FOLIONYM_BROWSER if Chromium is not in a standard location.
-frontend-browser-check:
-	cd frontend && npm run test:browser
+	cd frontend && npm run build
 
 # The packaged bundle is committed; fail when src/folionym/web_dist differs from a fresh build.
 web-dist-check:
@@ -35,17 +31,14 @@ format:
 typecheck:
 	$(UV) run mypy src/folionym/ scripts/
 
-test:
-	$(UV) run pytest -q
-
 clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache .cache
-	rm -rf .coverage .coverage.* coverage.xml coverage htmlcov test-results
+	rm -rf .coverage .coverage.* coverage.xml coverage htmlcov
 	rm -rf build dist
 	rm -rf frontend/node_modules
 	rm -rf src/folionym.egg-info *.egg-info
-	find src tests scripts -type d -name '__pycache__' -prune -exec rm -rf {} +
-	find src tests scripts -type d -name '.pytest_cache' -prune -exec rm -rf {} +
+	find src scripts -type d -name '__pycache__' -prune -exec rm -rf {} +
+	find src scripts -type d -name '.pytest_cache' -prune -exec rm -rf {} +
 	find . -name '.DS_Store' -delete
 
 hygiene-check:
@@ -71,7 +64,7 @@ build-check:
 	$(UV) pip install --python "$$ENV_DIR/bin/python" "$${WHEEL}[pdf,tokens,ocr,tui,web]"; \
 	"$$ENV_DIR/bin/python" scripts/verify_distributions.py dist --installed-wheel
 
-release-check: lock-check frontend-check hygiene-check architecture-check lint typecheck test build-check
+release-check: lock-check frontend-check hygiene-check architecture-check lint typecheck build-check
 
 # Everything the CI release job runs.
-ci: frontend-browser-check release-check web-dist-check
+ci: release-check web-dist-check

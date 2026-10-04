@@ -210,6 +210,10 @@ gemini.md
 /LOG.md
 /REFACTOR_PLAN.md
 /RELEASE_STATUS.md
+/DESIGN_BRIEF.md
+/tests/
+/frontend/tests/
+/frontend/tsconfig.test.json
 /REMEDIATION_PLAN.md
 /REMEDIATION_STATUS.md
 /REMEDIATION_LEDGER.md

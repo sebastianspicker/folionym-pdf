@@ -37,6 +37,4 @@ Every implementation change must preserve these filesystem invariants:
 
 New rename behavior belongs in the owning implementation module without bypassing
 the facade. Changing exports or invariants requires an explicit contract update
-and focused tests. The retained direct contracts are covered by
-`tests/rename_ops/`, `tests/interfaces/test_cli_undo.py`, and
-`tests/application/test_post_rename_hook.py`.
+and focused checks.

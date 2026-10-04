@@ -92,16 +92,10 @@ unlimited event retention. These count limits do not limit the size of one plan.
 
 ## Verification
 
-Run focused Python tests with `uv run pytest`, frontend tests with `npm test`
-inside `frontend/`, and the real-browser suite with `npm run test:browser`. The
-browser suite uses an installed Chromium executable and an isolated profile; it
-downloads no browser or test framework. `make release-check` includes Node tests,
-Python checks, application tests, and built-distribution verification. CI also
-runs the browser suite.
+`make release-check` runs the Python checks and built-distribution verification.
 
-Synthetic tests cover early extraction termination, cache bounds, isolated model
-sessions, cancellation, bounded event history, stale sources, directory pruning,
-and selection across large plans. They verify mechanisms; they do not establish
+The bounded mechanisms above (early extraction termination, cache bounds, isolated model
+sessions, cancellation, event history, stale-source checks, directory pruning) do not establish
 OCR speed or throughput for a particular model endpoint.
 
 For a synthetic 1,000-item plan with 10,000 metadata characters per item,

@@ -303,7 +303,6 @@ non-loopback integration.
 | `src/folionym/interfaces/` | `cli`, `tui`, and `web` adapters plus the shared `ui_settings` |
 | `frontend/` | React 19, TypeScript, and Vite browser source |
 | `src/folionym/web_dist/` | generated browser assets included in the wheel |
-| `tests/` | `contracts/` (public surface), `workflows/` (end to end), one directory per package, and `tooling/` (repository scripts) |
 | `scripts/` | architecture, hygiene, and distribution checks |
 
 The installed commands are `folionym`, `folionym-tui`, `folionym-undo`, and
@@ -319,7 +318,6 @@ Run commands from the repository root:
 make format
 make lint
 make typecheck
-make test
 make frontend-check
 make architecture-check
 make release-check

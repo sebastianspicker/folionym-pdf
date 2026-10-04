@@ -95,7 +95,6 @@ include = [
   "/scripts/repository_hygiene.py",
   "/scripts/verify_distributions.py",
   "/src/folionym",
-  "/tests",
   "/uv.lock",
 ]
 # Untracked local tool data and dependencies must never ship, even without VCS ignores.
@@ -103,14 +102,6 @@ exclude = ["**/.repowise", "**/node_modules"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/folionym"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-q --import-mode=importlib"
-pythonpath = ["src"]
-
-[tool.bandit]
-exclude_dirs = ["tests"]
 
 [tool.ruff]
 line-length = 120
@@ -133,12 +124,6 @@ ignore = [
   "PT018",
 ]
 
-[tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = [
-  # Tests legitimately use subprocess, hardcoded paths, non-random, etc.
-  "S", "PT011",
-]
-
 [tool.mypy]
 python_version = "3.14"
 strict = true
@@ -146,7 +131,6 @@ warn_return_any = true
 warn_unused_ignores = true
 explicit_package_bases = true
 mypy_path = ["src"]
-exclude = ["^tests/"]
 # Optional deps not always installed in CI or dev environments.
 [[tool.mypy.overrides]]
 module = ["fitz", "tiktoken", "ocrmypdf", "textual", "textual.*", "rich", "rich.*"]

@@ -19,7 +19,15 @@ def reject_source_symlink(path: Path) -> None:
 
 def _open_path_without_symlinks(path: Path, *, directory: bool) -> int:
     """Open an absolute path one component at a time without following links."""
-    absolute = Path(os.path.abspath(path))
+    requested = os.path.abspath(path)
+    anchor = os.path.splitdrive(requested)[0] + os.sep if os.name == "nt" else os.sep
+    base_real = os.path.realpath(anchor)
+    resolved = os.path.realpath(os.path.join(base_real, requested))
+    if not (resolved == base_real or resolved.startswith(base_real.rstrip(os.sep) + os.sep)):
+        raise OSError(errno.EACCES, "Path is outside the filesystem root", requested)
+    if os.name != "nt" and resolved != requested:
+        raise OSError(errno.ELOOP, "Path contains symbolic links", requested)
+    absolute = Path(resolved)
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
     if directory:
         flags |= getattr(os, "O_DIRECTORY", 0)

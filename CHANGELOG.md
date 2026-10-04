@@ -13,14 +13,10 @@ candidate commit is tagged and published as a GitHub prerelease.
 ### Added
 
 - A README screenshot tour and a matching `tour.html` page in the static demo,
-  generated from the deterministic demo build by
-  `frontend/tests/capture-screenshots.mjs`.
+  generated from the deterministic demo build.
 - Bounded model-session concurrency, response-cache limits, vision image
   budgets, and an explicit full-text extraction compatibility option.
-- Dependency-free frontend unit and real-browser workflow tests, plus rendered
-  Textual workflow checks.
-- Linux full-gate CI plus targeted macOS and Windows smoke coverage on exact
-  CPython 3.14.6.
+- Linux full-gate CI on exact CPython 3.14.6.
 - A deterministic static browser demo build and GitHub Pages workflow that use
   simulated files and never call the local backend.
 - Alpha release notes, structured GitHub release-note categories, and a
@@ -33,7 +29,7 @@ candidate commit is tagged and published as a GitHub prerelease.
 ### Changed
 
 - Redesigned the browser interface, static demo, and screenshot tour as a
-  numbered rename register (see `DESIGN_BRIEF.md`). Proposed names now stack
+  numbered rename register. Proposed names now stack
   under current names and wrap instead of truncating; review and failure
   reasons appear beside their rows; Source shows an example filename taken
   apart into its fields; the Apply report lists the real status of every file

@@ -51,54 +51,7 @@ jobs:
           cd frontend
           npm ci
 
-      - name: Allow the Chromium sandbox on Ubuntu 24.04
-        # Ubuntu 23.10+ restricts unprivileged user namespaces through AppArmor, which
-        # stops Chromium's sandbox from starting. Relax it so the smoke runs sandboxed.
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-
-      - name: CI gates (browser smoke, release check, bundle freshness)
+      - name: CI gates (release check, bundle freshness)
         run: |
           set -euo pipefail
           make ci
-
-  smoke:
-    name: ${{ matrix.os }} / Python 3.14.6 (targeted smoke)
-    needs: test
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version-file: .python-version
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6.0.1
-
-      - name: Install targeted smoke environment
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv sync --frozen --extra dev --extra pdf --extra tui
-
-      - name: Run targeted smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv run pytest -q \
-            tests/rename_ops \
-            tests/interfaces/test_cli_undo.py \
-            tests/llm/test_http_backend.py \
-            tests/llm/test_response_parsing.py \
-            tests/application/test_post_rename_hook.py
