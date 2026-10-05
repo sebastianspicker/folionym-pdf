@@ -15,7 +15,7 @@ export function PreviewFooter({ selectedCount, onBack, onOpenConfirm }: PreviewF
   return (
     <>
       <div className="consequence-copy" aria-live="polite">
-        <span className="consequence-count">{selectedCount}</span>
+        <span className="consequence-count" key={selectedCount}>{selectedCount}</span>
         <div>
           <strong>
             {nameLabel} ticked to write

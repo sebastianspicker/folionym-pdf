@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, errorMessage } from "../api";
+import { api, errorMessage, isDemo } from "../api";
 import { AppChrome, Button, PageLoader } from "../components";
 import { ArrowRightIcon, WarningIcon } from "../icons";
 import { isLocalEndpoint } from "../lib/privacy";
@@ -26,7 +26,7 @@ function headline(counts: Report["counts"]): { title: string; detail: string } {
     return {
       title: parts.filter(Boolean).join(", "),
       detail:
-        "Files that failed a check, or were not reached, were left exactly as they were. Each one says why below.",
+        "Failed and unreached files were not changed. Each one lists the reason.",
     };
   }
   if (counts.renamed === 0) {
@@ -87,6 +87,9 @@ export function ApplyPage({ bootstrap }: { bootstrap: Bootstrap }) {
           <div>
             <h1>{summary.title}</h1>
             <p>{summary.detail}</p>
+            {isDemo ? (
+              <p className="result-demo-note">Demo report. No file on your computer was changed.</p>
+            ) : null}
           </div>
           <Button onClick={() => {
             navigate("source");
@@ -94,16 +97,19 @@ export function ApplyPage({ bootstrap }: { bootstrap: Bootstrap }) {
             New source <ArrowRightIcon />
           </Button>
         </header>
-        <section aria-label="Apply totals">
-        <dl className="tally">
-          {TALLY.map(({ key, label }) => (
-            <div className={`tally-cell tally-cell--${key} ${report.counts[key] ? "" : "is-zero"}`} key={key}>
-              <dt>{label}</dt>
-              <dd>{report.counts[key]}</dd>
-            </div>
-          ))}
-        </dl>
-        </section>
+        {TALLY.some(({ key }) => report.counts[key] > 0) ? (
+          <section aria-label="Apply totals">
+            {/* Only outcomes that happened are counted; a row of zeros says nothing. */}
+            <dl className="tally">
+              {TALLY.filter(({ key }) => report.counts[key] > 0).map(({ key, label }) => (
+                <div className={`tally-cell tally-cell--${key}`} key={key}>
+                  <dt>{label}</dt>
+                  <dd>{report.counts[key]}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ) : null}
         <ApplyReportLedger items={report.items} />
         <p className="result-footnote">
           This report lasts only while Folionym runs. For an undo trail, set a rename log under Fine-tune → Output,

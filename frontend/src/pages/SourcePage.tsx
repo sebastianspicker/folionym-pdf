@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ApiError, api, errorMessage } from "../api";
+import { ApiError, api, errorMessage, isDemo } from "../api";
 import {
   AppChrome,
   Breakable,
@@ -182,11 +182,8 @@ export function SourcePage({
     >
       <main className="source-shell">
         <header className="source-heading">
-          <h1>Which PDFs need better names?</h1>
-          <p>
-            Pick a folder or a single file. Folionym reads each PDF on this computer and proposes a name; you
-            decide which names get written.
-          </p>
+          <h1>Choose the PDFs to rename</h1>
+          <p>Folionym reads each PDF and proposes a name from its contents. Nothing is renamed until you apply.</p>
         </header>
 
         <section aria-labelledby="source-slip-title" className="source-slip">
@@ -251,28 +248,33 @@ export function SourcePage({
               />
             </Field>
           )}
+          {isDemo ? (
+            <p className="source-demo-note">
+              This demo folder holds simulated documents. Nothing on your computer is read.
+            </p>
+          ) : null}
+          <div className="source-go">
+            <Button className="source-start" onClick={() => {
+              void startPreview();
+            }} type="button" variant="primary">
+              Build preview <ArrowRightIcon />
+            </Button>
+          </div>
         </section>
 
         <aside aria-labelledby="source-next-title" className="source-aside">
-          <h2 id="source-next-title">Before anything moves</h2>
-          <ol className="assurances">
+          <h2 id="source-next-title">What happens next</h2>
+          <ul className="assurances">
             <li>
-              <strong>Preview proposes, it never renames.</strong> Every PDF stays exactly where and as it is.
+              <strong>Preview</strong> Reads each PDF and proposes a name. No file is changed.
             </li>
             <li>
-              <strong>Doubt is shown, not hidden.</strong> Uncertain names are marked Review, with the evidence
-              beside them.
+              <strong>Review</strong> Tick the names you want. Uncertain names are marked Review, with the reason.
             </li>
             <li>
-              <strong>Apply writes only what you tick.</strong> Exact names, re-checked first; any conflict stops
-              that file.
+              <strong>Apply</strong> Renames only the ticked files, after checking each file and target again.
             </li>
-          </ol>
-          <Button className="button--full source-start" onClick={() => {
-            void startPreview();
-          }} type="button" variant="primary">
-            Build preview <ArrowRightIcon />
-          </Button>
+          </ul>
         </aside>
 
         <section aria-labelledby="rules-title" className="rules">

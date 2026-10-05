@@ -48,14 +48,8 @@ function AppHeader({
 }) {
   const nextTheme = theme === "light" ? "dark" : "light";
   return (
-    <>
-      {isDemo ? (
-        <p className="demo-band">
-          <strong>Demo.</strong> Simulated documents in your browser. Nothing on your computer is read or renamed.{" "}
-          <a href={`${import.meta.env.BASE_URL}tour.html`}>Screenshot tour</a>
-        </p>
-      ) : null}
-      <header className="masthead">
+    <header className="masthead">
+      <div className="masthead-brand">
         <a
           aria-label="Folionym, back to Source"
           className="brand"
@@ -65,30 +59,39 @@ function AppHeader({
           <BrandMark className="brand-mark" size={22} />
           <span className="brand-word">Folionym</span>
         </a>
-
-        <Stepper active={active} />
-
-        {source ? (
-          <span className="visually-hidden">
-            Scope: {compactPath(source)}
-            {sourceMeta ? `, ${sourceMeta}` : ""}
-          </span>
+        {isDemo ? (
+          <a className="demo-tag" href={`${import.meta.env.BASE_URL}tour.html`}>
+            <strong>Demo</strong>
+            <span className="demo-tag__more"> About Folionym</span>
+            <span className="visually-hidden">
+              . Simulated documents; nothing on your computer is read or renamed.
+            </span>
+          </a>
         ) : null}
+      </div>
 
-        <div className="header-actions">
-          <PrivacyChip external={external} />
-          <button
-            aria-label={`Switch to ${nextTheme} theme`}
-            className="icon-button theme-toggle"
-            onClick={onThemeChange}
-            title={`Switch to ${nextTheme} theme`}
-            type="button"
-          >
-            {theme === "light" ? <MoonIcon /> : <SunIcon />}
-          </button>
-        </div>
-      </header>
-    </>
+      <Stepper active={active} />
+
+      {source ? (
+        <span className="visually-hidden">
+          Scope: {compactPath(source)}
+          {sourceMeta ? `, ${sourceMeta}` : ""}
+        </span>
+      ) : null}
+
+      <div className="header-actions">
+        <PrivacyChip external={external} />
+        <button
+          aria-label={`Switch to ${nextTheme} theme`}
+          className="icon-button theme-toggle"
+          onClick={onThemeChange}
+          title={`Switch to ${nextTheme} theme`}
+          type="button"
+        >
+          {theme === "light" ? <MoonIcon /> : <SunIcon />}
+        </button>
+      </div>
+    </header>
   );
 }
 

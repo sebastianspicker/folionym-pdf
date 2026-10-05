@@ -45,10 +45,10 @@ ul {
 h1,
 h2,
 h3 {
-  font-family: var(--serif);
-  font-weight: 500;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
+  font-family: var(--sans);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
   color: var(--ink);
   text-wrap: balance;
 }
@@ -97,8 +97,9 @@ kbd {
 }
 
 a {
-  color: var(--verdigris-ink);
-  text-decoration-thickness: 1px;
+  color: var(--ink);
+  text-decoration-color: var(--marker-ink);
+  text-decoration-thickness: 2px;
   text-underline-offset: 3px;
 }
 
@@ -113,7 +114,7 @@ a {
 }
 
 ::selection {
-  background: var(--verdigris-wash);
+  background: var(--marker-wash);
   color: var(--ink);
 }
 
@@ -134,14 +135,22 @@ a {
   border: 0;
 }
 
-/* A micro label: column heads and catalogue field names. */
+/* A field label: sentence case in the interface face. Weight, not capitals
+   and tracking, separates it from the value beneath. */
 .label {
   font-family: var(--sans);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink-2);
+}
+
+/* The highlighter: a marker stroke behind text, clipped per line so wrapped
+   filenames keep it on every line. Used only for what the model produced. */
+.highlight,
+.row.is-selected .name__new {
+  background-image: linear-gradient(transparent 14%, var(--marker-wash) 14%, var(--marker-wash) 90%, transparent 90%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 /* Filenames and paths are never cut or hyphenated. They wrap after their own

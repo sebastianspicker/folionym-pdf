@@ -27,6 +27,37 @@
   width: min(680px, 100%);
 }
 
+/* Sheet: evidence on a phone rises from the bottom edge, over the register it
+   belongs to, and leaves the top of that register visible. */
+.modal-layer--sheet {
+  place-items: end stretch;
+  padding: 0;
+}
+
+.modal--sheet {
+  width: 100%;
+  max-height: 86dvh;
+  border-bottom: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: sheet-up var(--dur) var(--ease);
+}
+
+.modal--sheet .modal__body {
+  padding: 0 var(--gutter) var(--s-6);
+}
+
+.modal--sheet .inspector-id .label {
+  display: none; /* the sheet title already names it */
+}
+
+.modal--sheet .inspector {
+  padding: 0;
+  border: 0;
+  background: none;
+  animation: none;
+}
+
 .modal__header {
   display: flex;
   align-items: flex-start;
@@ -130,7 +161,7 @@
 }
 
 .run-count {
-  font-family: var(--serif);
+  font-family: var(--mono);
   font-size: var(--text-xl);
   line-height: 1;
   font-variant-numeric: lining-nums tabular-nums;
@@ -324,6 +355,13 @@
 @keyframes fade-in {
   from {
     opacity: 0;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
   }
 }
 

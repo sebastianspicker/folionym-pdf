@@ -1,22 +1,42 @@
 # Third-party notices
 
-## Newsreader, Atkinson Hyperlegible Next, and Atkinson Hyperlegible Mono
+## Phosphor Icons
 
-The web interface imports the Latin subsets of Newsreader, Atkinson Hyperlegible
-Next, and Atkinson Hyperlegible Mono from `@fontsource/newsreader`,
-`@fontsource/atkinson-hyperlegible-next`, and
-`@fontsource/atkinson-hyperlegible-mono`, version `5.3.0`. The shipped package
-metadata and license files identify all three fonts as licensed under the SIL
-Open Font License, Version 1.1.
+The web interface imports interface icons from `@phosphor-icons/react`, version
+`2.1.10`, licensed under the MIT License.
 
-Copyright 2020 The Newsreader Project Authors
-(http://github.com/productiontype/Newsreader).
+```text
+MIT License
 
-Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors
-(https://github.com/googlefonts/atkinson-hyperlegible-next).
+Copyright (c) 2020 Phosphor Icons
 
-Copyright 2020-2024 The Atkinson Hyperlegible Mono Project Authors
-(https://github.com/googlefonts/atkinson-hyperlegible-next-mono).
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## Geist and Geist Mono
+
+The web interface and the Pages landing page import the Latin subsets of Geist
+and Geist Mono from `@fontsource/geist` and `@fontsource/geist-mono`, version
+`5.3.0`. The shipped package metadata and license files identify both fonts as
+licensed under the SIL Open Font License, Version 1.1.
+
+Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font).
 
 The license text supplied with those packages follows.
 

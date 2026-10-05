@@ -89,8 +89,9 @@ When Pages is enabled for Actions and the Pages workflow has deployed, the demo
 is at `https://sebastianspicker.github.io/folionym-pdf/`. It uses no PDF files,
 loopback service, or backend API requests: Source, Preview, and Apply work
 against in-browser mock data, and Apply reports simulated outcomes without
-changing files. A `tour.html` page on the same site adds the screenshot tour
-shown above.
+changing files. A `tour.html` landing page on the same site introduces the
+project with the screenshots shown above; its source is `frontend/tour.html`,
+a second Vite entry built only in demo mode.
 
 Build it separately from the packaged application:
 
@@ -100,8 +101,9 @@ npm run build:demo
 ```
 
 This writes `dist-demo/` with the project base `/folionym-pdf/`, a `404.html`
-fallback for route refreshes, and copies the screenshot tour from `docs/`. It
-never writes `src/folionym/web_dist/`. The *Pages demo* workflow validates this
+fallback for route refreshes, the `tour.html` landing page built from
+`frontend/tour.html`, and a copy of `docs/screenshots/`. It never writes
+`src/folionym/web_dist/`. The *Pages demo* workflow validates this
 build on pull requests and is configured to deploy it from `main` or a manually
 dispatched run. The repository's Pages source must be set to **GitHub Actions**
 before its first deployment. Inspecting the repository alone does not prove that

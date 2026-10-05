@@ -7,7 +7,7 @@ type Part = { field: string; words: string[] };
 const EXAMPLE = {
   date: "20240115",
   category: ["invoice"],
-  keywords: ["acme", "web", "hosting"],
+  keywords: ["brightwell", "hosting"],
   summary: ["annual", "plan"],
 };
 
@@ -80,7 +80,7 @@ export function NameAnatomy({ settings }: { settings: Settings }) {
           {parts.map((part, index) => `${index > 0 ? separator : ""}${joinWords(part.words, settings.case, index === 0)}`).join("")}
           .pdf, built from {parts.map((part) => part.field).join(", ")}.{" "}
         </span>
-        Example only. Each document supplies its own date and words.
+        Example. Each PDF fills these fields from its own text.
       </figcaption>
     </figure>
   );

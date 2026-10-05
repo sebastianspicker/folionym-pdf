@@ -1,7 +1,7 @@
 import { type RefObject } from "react";
 import { Breakable, Button, Checkbox, ErrorBanner, StatusPill } from "../../components";
 import { PAGE_SIZE, Pagination } from "../../components/Pagination";
-import { SearchIcon } from "../../icons";
+import { ChevronIcon, SearchIcon } from "../../icons";
 import { changedFilenameSegments } from "../../lib/filenameDiff";
 import type { Plan, PreviewItem, PreviewStatus } from "../../types";
 
@@ -35,11 +35,13 @@ type LedgerProps = {
   onSelectVisible: () => void;
   onClear: () => void;
   onActivate: (id: string) => void;
+  /** Opens the evidence for a row; used where evidence is not on screen. */
+  onOpen?: (id: string) => void;
   onDismissError: () => void;
   searchRef?: RefObject<HTMLInputElement | null>;
 };
 
-type Segment = { text: string; className: string | undefined };
+type Segment = { text: string; className: string };
 
 /** Splits a proposed name into kept and new text, with a leading date set apart. */
 function proposedSegments(currentName: string, proposedName: string): Segment[] {
@@ -47,11 +49,11 @@ function proposedSegments(currentName: string, proposedName: string): Segment[] 
   const segments: Segment[] = [];
   let offset = 0;
   for (const segment of changedFilenameSegments(currentName, proposedName)) {
-    const base = segment.changed ? undefined : "name__kept";
+    const base = segment.changed ? "name__new" : "name__kept";
     const end = offset + segment.text.length;
     if (offset < dateLength) {
       const split = Math.min(dateLength, end) - offset;
-      segments.push({ text: segment.text.slice(0, split), className: "name__date" });
+      segments.push({ text: segment.text.slice(0, split), className: segment.changed ? "name__date name__new" : "name__date" });
       if (split < segment.text.length) segments.push({ text: segment.text.slice(split), className: base });
     } else {
       segments.push({ text: segment.text, className: base });
@@ -77,6 +79,7 @@ export function Ledger({
   onSelectVisible,
   onClear,
   onActivate,
+  onOpen,
   onDismissError,
   searchRef,
 }: LedgerProps) {
@@ -162,6 +165,7 @@ export function Ledger({
               key={item.id}
               onClick={() => {
                 onActivate(item.id);
+                onOpen?.(item.id);
               }}
               onKeyDown={(event) => {
                 if (event.target !== event.currentTarget) return;
@@ -178,6 +182,7 @@ export function Ledger({
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   onActivate(item.id);
+                  onOpen?.(item.id);
                 }
               }}
               role="option"
@@ -229,6 +234,11 @@ export function Ledger({
                 ) : null}
               </div>
               <StatusPill label={filterLabel(item.status)} status={item.status} />
+              {onOpen ? (
+                <span aria-hidden="true" className="row-open">
+                  Evidence <ChevronIcon size={14} />
+                </span>
+              ) : null}
             </article>
           );
         })}

@@ -71,7 +71,7 @@ function InspectorDetail({
 
       {item.reason && (
         <section className={`inspector-note item-reason item-reason--${item.status}`}>
-          <h3 className="label">Why this name</h3>
+          <h3 className="label">Reason</h3>
           <p>{item.reason}</p>
         </section>
       )}

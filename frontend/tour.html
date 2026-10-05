@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Set the theme before first paint so the page never flashes the other one.
+      (function () {
+        var root = document.documentElement;
+        root.classList.add("js");
+        try {
+          root.dataset.theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        } catch (error) {
+          root.dataset.theme = "light";
+        }
+      })();
+    </script>
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f3f4f1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f110f" media="(prefers-color-scheme: dark)" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23121412'/%3E%3Cpath d='M10 6.5h10l4 4v15H10zM14 15h6.5M14 19h6.5M14 23h3.5M7 10.5v15' fill='none' stroke='%23c6ef2b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <title>Folionym: rename PDFs from their contents</title>
+    <meta
+      name="description"
+      content="Folionym reads each PDF, asks a local model for type and keywords, and proposes a filename. You approve every rename."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Folionym: rename PDFs from their contents" />
+    <meta
+      property="og:description"
+      content="Folionym reads each PDF, asks a local model for type and keywords, and proposes a filename. You approve every rename."
+    />
+    <meta property="og:image" content="https://sebastianspicker.github.io/folionym-pdf/screenshots/02-preview.png" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header class="nav" data-audit="nav">
+      <div class="nav__inner">
+        <a class="brand" href="tour.html">
+          <svg class="brand__mark" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+            <path d="M6 3.5h9l3.5 3.5v13.5H6z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.6" />
+            <path d="M9 11.5h6.5M9 15h6.5M9 18.5h3.5" stroke="currentColor" stroke-linecap="round" stroke-width="1.6" />
+            <path d="M3.5 7v13.5" stroke="currentColor" stroke-linecap="round" stroke-width="1.6" />
+          </svg>
+          <span>Folionym</span>
+        </a>
+        <nav class="nav__links" aria-label="Primary">
+          <a href="./">Demo</a>
+          <a href="#install">Install</a>
+          <a href="https://github.com/sebastianspicker/folionym-pdf">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero__text">
+          <h1 id="hero-title" class="hero__title">Rename PDFs from their contents.</h1>
+          <p class="hero__sub" data-audit="subtext">
+            Folionym reads each PDF, asks a local model for type and keywords, and proposes a filename. You approve every rename.
+          </p>
+          <div class="hero__actions">
+            <a class="btn btn--primary" href="./" data-audit="cta">Open the demo</a>
+            <a class="btn" href="#install">Install</a>
+          </div>
+        </div>
+        <figure class="hero__figure">
+          <div class="doc">
+            <img
+              src="landing/extract-invoice.webp"
+              width="1401"
+              height="1170"
+              fetchpriority="high"
+              decoding="async"
+              alt="A Brightwell Hosting invoice with the sender, the word Invoice, the invoice number, the date 15 Jan 2024, and the total of 129,00 EUR highlighted."
+            />
+          </div>
+          <figcaption class="rename">
+            <span class="visually-hidden">Example: scan_0047.pdf is renamed to 20240115-invoice-brightwell-hosting-129-00-eur.pdf using the highlighted fields.</span>
+            <span class="rename__old" aria-hidden="true">scan_0047.pdf</span>
+            <span class="rename__new" aria-hidden="true"><span class="nw"><span class="hl" style="--i: 0">20240115</span>-</span><span class="nw"><span class="hl" style="--i: 1">invoice</span>-</span><span class="hl" style="--i: 2">brightwell-</span><span class="nw"><span class="hl" style="--i: 3">hosting</span>-</span><span class="hl" style="--i: 4">129-</span><span class="hl" style="--i: 5">00-</span><span class="nw"><span class="hl" style="--i: 6">eur</span>.pdf</span></span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="examples" aria-labelledby="examples-title">
+        <h2 id="examples-title">Before and after</h2>
+        <p class="section__lede">Six files from the demo folder. Highlighted parts come from the document text.</p>
+        <ul class="slips" data-slips>
+          <li class="slip">
+            <p class="slip__old">scan_0047.pdf</p>
+            <p class="slip__new"><span class="visually-hidden">renamed to </span><span class="nw"><span class="hl" style="--i: 0">20240115</span>-</span><span class="nw"><span class="hl" style="--i: 1">invoice</span>-</span><span class="hl" style="--i: 2">brightwell-</span><span class="nw"><span class="hl" style="--i: 3">hosting</span>-</span><span class="hl" style="--i: 4">129-</span><span class="hl" style="--i: 5">00-</span><span class="nw"><span class="hl" style="--i: 6">eur</span>.pdf</span></p>
+          </li>
+          <li class="slip">
+            <p class="slip__old">Kontoauszug_01_2024 (1).pdf</p>
+            <p class="slip__new"><span class="visually-hidden">renamed to </span><span class="nw"><span class="hl" style="--i: 0">20240131</span>-</span><span class="nw"><span class="hl" style="--i: 1">statement</span>-</span><span class="hl" style="--i: 2">deutsche-</span><span class="nw"><span class="hl" style="--i: 3">bank</span>-</span><span class="hl" style="--i: 4">giro-</span><span class="nw"><span class="hl" style="--i: 5">january</span>.pdf</span></p>
+          </li>
+          <li class="slip">
+            <p class="slip__old">Vertrag_final_FINAL_v2.pdf</p>
+            <p class="slip__new"><span class="visually-hidden">renamed to </span><span class="nw"><span class="hl" style="--i: 0">20240301</span>-</span><span class="nw"><span class="hl" style="--i: 1">contract</span>-</span><span class="hl" style="--i: 2">freelance-</span><span class="nw"><span class="hl" style="--i: 3">meridian</span>-</span><span class="hl" style="--i: 4">design-</span><span class="nw"><span class="hl" style="--i: 5">system</span>.pdf</span></p>
+          </li>
+          <li class="slip">
+            <p class="slip__old">invoice (22).pdf</p>
+            <p class="slip__new"><span class="visually-hidden">renamed to </span><span class="nw"><span class="hl" style="--i: 0">20240220</span>-</span>invoice-<span class="hl" style="--i: 1">hetzner-</span><span class="nw"><span class="hl" style="--i: 2">cloud</span>-</span><span class="hl" style="--i: 3">inv-</span><span class="hl" style="--i: 4">2024-</span><span class="nw"><span class="hl" style="--i: 5">0184</span>.pdf</span></p>
+          </li>
+          <li class="slip">
+            <p class="slip__old">IMG_20240312_1441.pdf</p>
+            <p class="slip__new"><span class="visually-hidden">renamed to </span><span class="nw"><span class="hl" style="--i: 0">20240312</span>-</span><span class="nw"><span class="hl" style="--i: 1">receipt</span>-</span><span class="hl" style="--i: 2">unknown-</span><span class="nw"><span class="hl" style="--i: 3">vendor</span>-</span><span class="hl" style="--i: 4">84-</span><span class="hl" style="--i: 5">20-</span><span class="nw"><span class="hl" style="--i: 6">eur</span>.pdf</span></p>
+            <p class="slip__flag">Needs review</p>
+          </li>
+          <li class="slip">
+            <p class="slip__old">1706.03762v7.pdf</p>
+            <p class="slip__new"><span class="visually-hidden">renamed to </span><span class="nw"><span class="hl" style="--i: 0">20240405</span>-</span><span class="nw"><span class="hl" style="--i: 1">paper</span>-</span><span class="hl" style="--i: 2">attention-</span><span class="nw"><span class="hl" style="--i: 3">mechanisms</span>-</span><span class="hl" style="--i: 4">transformer-</span><span class="nw"><span class="hl" style="--i: 5">architecture</span>.pdf</span></p>
+            <p class="slip__flag">Needs review</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="workflow" aria-labelledby="workflow-title" data-tabs>
+        <div class="workflow__head">
+          <h2 id="workflow-title">How it works</h2>
+          <div class="tabs" role="tablist" aria-label="How it works">
+            <button class="tab" type="button" role="tab" id="tab-read" aria-controls="panel-read" aria-selected="true">
+              Read
+            </button>
+            <button class="tab" type="button" role="tab" id="tab-propose" aria-controls="panel-propose" aria-selected="false" tabindex="-1">
+              Propose
+            </button>
+            <button class="tab" type="button" role="tab" id="tab-approve" aria-controls="panel-approve" aria-selected="false" tabindex="-1">
+              Approve
+            </button>
+          </div>
+        </div>
+        <div class="panels reveal">
+          <div class="panel is-active" role="tabpanel" id="panel-read" aria-labelledby="tab-read" tabindex="0">
+            <p>Folionym takes the text layer, or runs OCR on scans, and finds the date, document type, sender, and amounts.</p>
+            <div class="frame frame--doc">
+              <img
+                src="landing/extract-statement.webp"
+                width="1401"
+                height="776"
+                loading="lazy"
+                decoding="async"
+                alt="A Deutsche Bank account statement with the bank name, Account statement, January 2024, and Girokonto highlighted."
+              />
+            </div>
+          </div>
+          <div class="panel" role="tabpanel" id="panel-propose" aria-labelledby="tab-propose" tabindex="0">
+            <p>Rules and a model you choose (any OpenAI-compatible endpoint, local by default) suggest the category, keywords, and summary.</p>
+            <div class="frame">
+              <picture>
+                <source type="image/webp" srcset="screenshots/02-preview.webp" />
+                <img
+                  src="screenshots/02-preview.png"
+                  width="2880"
+                  height="1800"
+                  loading="lazy"
+                  decoding="async"
+                  alt="Folionym Preview screen listing current and proposed names, with an evidence column for the selected document."
+                />
+              </picture>
+            </div>
+          </div>
+          <div class="panel" role="tabpanel" id="panel-approve" aria-labelledby="tab-approve" tabindex="0">
+            <p>Tick the names you want. Apply checks that each file is unchanged and the target is free, then renames it.</p>
+            <div class="frame">
+              <picture>
+                <source type="image/webp" srcset="screenshots/03-apply.webp" />
+                <img
+                  src="screenshots/03-apply.png"
+                  width="2880"
+                  height="2644"
+                  loading="lazy"
+                  decoding="async"
+                  alt="Folionym Apply report with totals and a per-file list of renamed, skipped, and unchanged documents."
+                />
+              </picture>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="safety" aria-labelledby="safety-title">
+        <h2 id="safety-title">Safety checks</h2>
+        <div class="bento">
+          <article class="cell cell--image">
+            <div class="cell__copy">
+              <h3>Preview changes nothing</h3>
+              <p>Preview builds a plan. Files are renamed only when you apply.</p>
+            </div>
+            <div class="frame frame--cell reveal">
+              <picture>
+                <source type="image/webp" srcset="screenshots/04-preview-dark.webp" />
+                <img
+                  src="screenshots/04-preview-dark.png"
+                  width="2880"
+                  height="1800"
+                  loading="lazy"
+                  decoding="async"
+                  alt="The Preview screen in Folionym's dark theme."
+                />
+              </picture>
+            </div>
+          </article>
+          <article class="cell">
+            <h3>Uncertain names are flagged</h3>
+            <p>When the evidence is thin, the name is marked Review and the reason is shown.</p>
+          </article>
+          <article class="cell">
+            <h3>Apply re-checks each file</h3>
+            <p>A changed source or an occupied target stops that file instead of renaming it.</p>
+          </article>
+          <article class="cell cell--marker">
+            <h3>Runs on your machine</h3>
+            <p>With a local model or <code>--no-llm</code>, no document text leaves your computer. External endpoints need confirmation.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="install" id="install" aria-labelledby="install-title">
+        <div class="install__text">
+          <h2 id="install-title">Install</h2>
+          <p>
+            Python 3.14 or later. Install from a clone of the repository; the pdf extra adds PyMuPDF. OCR and a
+            model endpoint are optional.
+          </p>
+        </div>
+        <div class="install__commands">
+          <figure class="cmd">
+            <figcaption>In a clone of the repository, create an environment</figcaption>
+            <pre><code>python3.14 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[pdf]'</code></pre>
+            <button class="copy" type="button" data-copy aria-label="Copy: In a clone of the repository, create an environment">Copy</button>
+          </figure>
+          <figure class="cmd">
+            <figcaption>Add the terminal and browser interfaces</figcaption>
+            <pre><code>python -m pip install -e '.[pdf,tui,web]'</code></pre>
+            <button class="copy" type="button" data-copy aria-label="Copy: Add the terminal and browser interfaces">Copy</button>
+          </figure>
+          <figure class="cmd">
+            <figcaption>Preview a folder without a model</figcaption>
+            <pre><code>folionym --dir ./input_files --no-llm --dry-run</code></pre>
+            <button class="copy" type="button" data-copy aria-label="Copy: Preview a folder without a model">Copy</button>
+          </figure>
+          <figure class="cmd">
+            <figcaption>Apply with backups and an undo log</figcaption>
+            <pre><code>folionym --dir ./input_files --interactive \
+  --backup-dir ./backup --rename-log ./rename.log
+folionym-undo --rename-log ./rename.log --dry-run</code></pre>
+            <button class="copy" type="button" data-copy aria-label="Copy: Apply with backups and an undo log">Copy</button>
+          </figure>
+          <figure class="cmd">
+            <figcaption>Open the terminal or browser interface</figcaption>
+            <pre><code>folionym-tui
+folionym-web</code></pre>
+            <button class="copy" type="button" data-copy aria-label="Copy: Open the terminal or browser interface">Copy</button>
+          </figure>
+          <p class="visually-hidden" aria-live="polite" data-copy-status></p>
+        </div>
+      </section>
+
+      <section class="faq" aria-labelledby="faq-title">
+        <h2 id="faq-title">FAQ</h2>
+        <div class="faq__list">
+          <details>
+            <summary>Does document text leave my computer?</summary>
+            <p>
+              Only if you point it at an external model endpoint or set up a post-rename hook. With a local endpoint or
+              <code>--no-llm</code>, everything stays on your machine.
+            </p>
+          </details>
+          <details>
+            <summary>What if a file changes after Preview?</summary>
+            <p>
+              Browser and directory-TUI Apply re-check each source and target. A changed source, duplicate target, or occupied
+              name fails instead of being renamed.
+            </p>
+          </details>
+          <details>
+            <summary>Can I undo a rename?</summary>
+            <p>
+              Record a log with <code>--rename-log</code> and run <code>folionym-undo</code>. It reverses safe same-directory
+              moves whose target still exists and whose original path is free.
+            </p>
+          </details>
+          <details>
+            <summary>Does the demo read my files?</summary>
+            <p>No. The demo runs in your browser on simulated documents. It reads no PDFs, calls no backend, and renames nothing.</p>
+          </details>
+          <details>
+            <summary>Which names does it produce?</summary>
+            <p>
+              By default <code>YYYYMMDD-category-keywords-summary.pdf</code>. Templates can also use project, version, invoice ID,
+              amount, and company fields.
+            </p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer__inner">
+        <a class="brand brand--small" href="tour.html">
+          <svg class="brand__mark" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+            <path d="M6 3.5h9l3.5 3.5v13.5H6z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.6" />
+            <path d="M9 11.5h6.5M9 15h6.5M9 18.5h3.5" stroke="currentColor" stroke-linecap="round" stroke-width="1.6" />
+            <path d="M3.5 7v13.5" stroke="currentColor" stroke-linecap="round" stroke-width="1.6" />
+          </svg>
+          <span>Folionym</span>
+        </a>
+        <p class="footer__license">MIT License</p>
+        <nav class="footer__links" aria-label="Project">
+          <a href="https://github.com/sebastianspicker/folionym-pdf#readme">README</a>
+          <a href="https://github.com/sebastianspicker/folionym-pdf/blob/main/docs/frontend.md">Browser guide</a>
+          <a href="https://github.com/sebastianspicker/folionym-pdf">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/tour/main.ts"></script>
+  </body>
+</html>

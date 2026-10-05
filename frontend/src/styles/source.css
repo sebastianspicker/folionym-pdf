@@ -21,11 +21,11 @@
 }
 
 .source-heading h1 {
-  max-width: 16ch;
+  max-width: 18ch;
   font-size: var(--text-2xl);
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.05;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
 }
 
 .source-heading p {
@@ -130,9 +130,9 @@
   white-space: nowrap;
 }
 
-.anatomy-part[data-field="date"] .anatomy-text {
-  color: var(--verdigris-ink);
-  border-bottom-color: var(--verdigris);
+/* Every field the model fills is marked; the extension is not. */
+.anatomy-part:not(.anatomy-part--ext) .anatomy-text {
+  background-image: linear-gradient(transparent 12%, var(--marker-wash) 12%, var(--marker-wash) 88%, transparent 88%);
 }
 
 .anatomy-part--ext .anatomy-text {
@@ -147,10 +147,7 @@
 .anatomy-field {
   padding-top: 5px;
   font-family: var(--sans);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -160,9 +157,8 @@
 
 .anatomy figcaption {
   margin-top: var(--s-4);
-  font-family: var(--serif);
+  font-family: var(--sans);
   font-size: var(--text-md);
-  font-style: italic;
   color: var(--muted);
 }
 
@@ -206,32 +202,12 @@
   border-bottom: 1px solid var(--ink);
 }
 
-.assurances {
-  counter-reset: assurance;
-  margin-bottom: var(--s-6);
-}
-
 .assurances li {
-  counter-increment: assurance;
-  position: relative;
-  padding: var(--s-3) 0 var(--s-3) 2.25rem;
+  padding: var(--s-3) 0;
   border-bottom: var(--hairline);
   color: var(--muted);
   font-size: var(--text-sm);
   line-height: 1.5;
-}
-
-.assurances li::before {
-  content: counter(assurance);
-  position: absolute;
-  top: 9px;
-  left: 0;
-  font-family: var(--serif);
-  font-size: var(--text-lg);
-  font-weight: 400;
-  line-height: 1.2;
-  font-variant-numeric: oldstyle-nums;
-  color: var(--verdigris);
 }
 
 .assurances strong {
@@ -241,9 +217,25 @@
   margin-bottom: 2px;
 }
 
+/* The one action on the page sits inside the slip that defines it. */
+.source-go {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--s-4);
+  border-top: var(--hairline);
+}
+
 .source-start {
   min-height: 44px;
+  padding: 0 var(--s-6);
   font-size: 0.9375rem;
+}
+
+.source-demo-note {
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--ochre);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
 }
 
 /* Consent dialog body */
@@ -322,6 +314,10 @@
 
   .source-picker .button {
     justify-self: start;
+  }
+
+  .source-go .source-start {
+    width: 100%;
   }
 
   .rule-row {

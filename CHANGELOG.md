@@ -28,6 +28,20 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Changed
 
+- Re-themed the browser interface and Pages site as "Highlighter": ink on a
+  cool off-white, Geist and Geist Mono instead of Newsreader and Atkinson
+  Hyperlegible, and one chartreuse marker used only for model output and what
+  will be written (the new parts of ticked names, renamed files, the primary
+  action). Interface copy is plain and task-first.
+- Reworked the browser interface for small screens and the Pages site. The
+  demo marker now sits in the masthead (56px on desktop, 80px on phones) and
+  links to an About page; Build preview sits inside the source panel so it is
+  visible without scrolling; Preview evidence opens as a bottom sheet below
+  900px and the status filters no longer clip; the Apply tally lists only
+  outcomes that happened. Field labels are sentence case, interface icons come
+  from Phosphor, and demo thumbnails are rendered first pages of simulated
+  sample documents. The screenshot tour is replaced by a landing page built
+  from `frontend/tour.html` at the same `tour.html` address.
 - Redesigned the browser interface, static demo, and screenshot tour as a
   numbered rename register. Proposed names now stack
   under current names and wrap instead of truncating; review and failure

@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
-import { AppChrome, Button, PageLoader, RunOverlay } from "../components";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppChrome, Button, Modal, PageLoader, RunOverlay } from "../components";
+import { isDemo } from "../api";
 import { WarningIcon } from "../icons";
 import { isLocalEndpoint } from "../lib/privacy";
 import { navigate } from "../lib/routing";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import type { Bootstrap, Settings } from "../types";
 import { ApplyConfirmDialog } from "./preview/ApplyConfirmDialog";
 import { FilterRail } from "./preview/FilterRail";
@@ -29,6 +31,18 @@ function processingFacts(settings: Settings) {
 
 export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
   const searchRef = useRef<HTMLInputElement>(null);
+  // Below the desk layout the evidence column has no room; it opens as a sheet.
+  const narrow = useMediaQuery("(max-width: 899px)");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+  }, []);
+  // Widening past the breakpoint puts evidence back on screen; the sheet must
+  // not stay open invisibly or reappear when the window narrows again.
+  useEffect(() => {
+    if (!narrow) setSheetOpen(false);
+  }, [narrow]);
+  const sheetVisible = narrow && sheetOpen;
   const planId = sessionStorage.getItem("folionym.plan");
   const preview = usePreviewPlan(planId);
   const apply = usePreviewApply({
@@ -43,7 +57,7 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
       (target.isContentEditable ||
         ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isEditable(event.target)) return;
+      if (sheetVisible || isEditable(event.target)) return;
       if (
         event.key === "/" &&
         !event.metaKey &&
@@ -79,6 +93,7 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
     preview.selectVisible,
     preview.selectableCount,
     preview.selected.size,
+    sheetVisible,
   ]);
 
   if (preview.loading) return <PageLoader label="Loading preview" />;
@@ -140,6 +155,16 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
             onClose={apply.closeRun}
             run={apply.run}
           />
+          {narrow ? (
+            <Modal
+              onClose={closeSheet}
+              open={sheetVisible && Boolean(preview.activeItem)}
+              sheet
+              title={isDemo ? "Evidence from demo data" : "Evidence"}
+            >
+              <Inspector item={preview.activeItem} plan={preview.plan} />
+            </Modal>
+          ) : null}
         </>
       }
       source={preview.plan.source}
@@ -163,6 +188,9 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
           allVisibleSelected={preview.allVisibleSelected}
           error={preview.error}
           onActivate={preview.setActiveId}
+          onOpen={narrow ? () => {
+            setSheetOpen(true);
+          } : undefined}
           onClear={() => {
             preview.setSelected(new Set());
           }}
@@ -179,7 +207,7 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
           selected={preview.selected}
           visibleItems={preview.visibleItems}
         />
-        <Inspector item={preview.activeItem} plan={preview.plan} />
+        {narrow ? null : <Inspector item={preview.activeItem} plan={preview.plan} />}
       </>
     </AppChrome>
   );

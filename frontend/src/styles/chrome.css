@@ -7,25 +7,6 @@
   min-height: 100dvh;
 }
 
-.demo-band {
-  padding: 7px var(--gutter);
-  border-bottom: 1px solid var(--ochre);
-  background: var(--ochre-wash);
-  color: var(--ink);
-  font-size: var(--text-xs);
-  text-align: center;
-}
-
-.demo-band strong {
-  color: var(--ochre);
-}
-
-.demo-band a {
-  margin-left: var(--s-2);
-  font-weight: 600;
-  color: var(--ink);
-}
-
 .masthead {
   position: sticky;
   top: 0;
@@ -40,6 +21,14 @@
   background: var(--sheet);
 }
 
+.masthead-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  justify-self: start;
+  min-width: 0;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -50,14 +39,46 @@
 }
 
 .brand-mark {
-  color: var(--verdigris);
+  color: var(--ink);
+}
+
+/* Demo marker: always beside the brand, so simulated data can never pass for
+   local files. Ochre is the colour of "a person should look". */
+.demo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 26px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--ochre);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.demo-tag strong {
+  color: var(--ochre);
+  font-weight: 600;
+}
+
+.demo-tag__more {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.demo-tag:hover {
+  background: var(--ochre-wash);
 }
 
 .brand-word {
-  font-family: var(--serif);
-  font-size: 1.3125rem;
-  font-weight: 500;
-  letter-spacing: -0.015em;
+  font-family: var(--sans);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.035em;
   line-height: 1;
 }
 
@@ -84,7 +105,7 @@
 
 .stage--done + .stage::before,
 .stage--done + .stage--current::before {
-  background: var(--verdigris);
+  background: var(--marker-ink);
 }
 
 .stage-hit {
@@ -103,21 +124,21 @@
   height: 20px;
   border: 1px solid currentColor;
   border-radius: 50%;
-  font-family: var(--serif);
-  font-size: var(--text-sm);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
   font-weight: 500;
   line-height: 1;
   font-variant-numeric: lining-nums;
 }
 
 .stage--done .stage-hit {
-  color: var(--verdigris-ink);
+  color: var(--marker-ink);
 }
 
 .stage--done .stage-node {
-  border-color: var(--verdigris);
-  background: var(--verdigris);
-  color: var(--on-verdigris);
+  border-color: var(--marker-edge);
+  background: var(--marker);
+  color: var(--on-marker);
 }
 
 .stage--current .stage-hit {
@@ -156,7 +177,7 @@
 .privacy-mark {
   width: 8px;
   height: 8px;
-  background: var(--verdigris);
+  background: var(--marker-ink);
 }
 
 .privacy-chip--external {
@@ -204,11 +225,25 @@
 }
 
 .consequence-count {
-  font-family: var(--serif);
+  font-family: var(--mono);
   font-size: var(--text-xl);
   font-weight: 500;
   line-height: 1;
   font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* The count re-sets itself when a tick changes it: feedback that the
+   selection was heard, without moving anything else. */
+.consequence-count {
+  display: inline-block;
+  animation: count-tick var(--dur) var(--ease);
+}
+
+@keyframes count-tick {
+  from {
+    opacity: 0.35;
+    transform: translateY(-5px);
+  }
 }
 
 .consequence-copy strong {
@@ -275,22 +310,42 @@
   }
 }
 
+@media (max-width: 1100px) {
+  /* Hidden visually, kept in the link name so it still says where it goes. */
+  .demo-tag__more {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 760px) {
+  /* Two rows, 80px in all: identity and state above, the stages below. */
   .masthead {
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--s-2) var(--s-4);
-    padding-top: var(--s-2);
+    grid-template-rows: 46px 33px;
+    gap: 0 var(--s-3);
+  }
+
+  .brand-word {
+    font-size: 1.1875rem;
   }
 
   .stepper {
     grid-column: 1 / -1;
     grid-row: 2;
+    display: flex;
+    align-items: center;
     margin: 0 calc(var(--gutter) * -1);
-    padding: 0 var(--gutter) var(--s-1);
+    padding: 0 var(--gutter);
     border-top: var(--hairline);
   }
 
   .stepper ol {
+    flex: 1;
     justify-content: space-between;
   }
 
@@ -307,9 +362,14 @@
     width: auto;
   }
 
+  .stage-hit {
+    padding: 0 var(--s-1);
+  }
+
   .header-actions {
     grid-column: 2;
     grid-row: 1;
+    gap: var(--s-1);
   }
 
   .consequence {

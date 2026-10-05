@@ -92,7 +92,7 @@ function buildReport(selectedIds: string[]): Report {
         source_name: item.current_name,
         target_name: item.proposed_name,
         status: "renamed" as const,
-        reason: "Demo result. No local file was changed.",
+        reason: null,
       };
     }
     if (item.status === "failed") {

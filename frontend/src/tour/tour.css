@@ -1,0 +1,882 @@
+@import "../styles/fonts.css";
+@import "../styles/tokens.css";
+
+/*
+ * Folionym landing page. Every colour comes from the app's Highlighter tokens;
+ * this file only adds layout, the page measure, and the one motion ease.
+ * The marker fill appears on highlights, the primary button, and one cell.
+ */
+:root {
+  --page-max: 1200px;
+  --page-pad: max(var(--gutter), calc((100% - var(--page-max)) / 2));
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --section-y: clamp(56px, 7vw, 96px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-padding-top: calc(var(--masthead-h) + var(--s-4));
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: clip;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--sans);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+h3 {
+  font-size: var(--text-lg);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--ink);
+  text-underline-offset: 3px;
+}
+
+code,
+pre,
+.num {
+  font-family: var(--mono);
+  font-variant-ligatures: none;
+}
+
+p code,
+summary code {
+  font-size: 0.9375em;
+  overflow-wrap: anywhere;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+figure {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+main:focus {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  top: var(--s-2);
+  left: var(--s-2);
+  z-index: 20;
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius);
+  background: var(--sheet);
+  color: var(--ink);
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
+/* Buttons */
+.btn,
+.copy,
+.tab {
+  font: inherit;
+  cursor: pointer;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--s-5);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--sheet);
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+
+.btn:hover {
+  border-color: var(--ink);
+}
+
+.btn--primary {
+  border-color: var(--marker-edge);
+  background: var(--marker);
+  color: var(--on-marker);
+}
+
+.btn--primary:hover {
+  border-color: var(--marker-edge);
+  background: var(--marker-deep);
+}
+
+/* Nav */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: var(--hairline);
+  background: var(--paper);
+}
+
+.nav__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  height: var(--masthead-h);
+  padding-inline: var(--page-pad);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1.1875rem;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brand__mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: var(--ink);
+}
+
+.nav__links {
+  display: flex;
+  align-items: center;
+  gap: clamp(var(--s-3), 3vw, var(--s-8));
+  white-space: nowrap;
+}
+
+.nav__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--ink-2);
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nav__links a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* Highlighted filename parts. Each part is a small inline block so a long
+   name can wrap between parts while every band stays on one line. The static
+   band matches the app's .highlight; the sweep below replaces it with a bar. */
+.nw {
+  white-space: nowrap;
+}
+
+.hl {
+  display: inline-block;
+  line-height: 1.3;
+  background-image: linear-gradient(transparent 14%, var(--marker-wash) 14%, var(--marker-wash) 90%, transparent 90%);
+}
+
+.rename__new,
+.slip__new {
+  position: relative;
+  z-index: 0;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-variant-ligatures: none;
+  overflow-wrap: anywhere;
+}
+
+/* Hero: the claim on the left, a real extracted invoice on the right. */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: start;
+  gap: clamp(var(--s-8), 4.5vw, var(--s-16));
+  padding: clamp(var(--s-8), 5vw, 72px) var(--page-pad) var(--section-y);
+}
+
+.hero__text {
+  container-type: inline-size;
+  padding-top: clamp(0px, 3.5vw, 56px); /* sits with the top of the document, not its middle */
+}
+
+.hero__title {
+  /* Two lines at most: "Rename PDFs from" is the longer half. */
+  font-size: clamp(2.25rem, 10cqi, 4rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+
+.hero__sub {
+  max-width: 38ch;
+  margin-top: var(--s-5);
+  color: var(--ink-2);
+  font-size: clamp(1.0625rem, 0.98rem + 0.3vw, 1.1875rem);
+  line-height: 1.5;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-top: var(--s-8);
+}
+
+.doc {
+  overflow: hidden;
+  border: var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--sheet);
+  box-shadow: var(--sheet-offset);
+}
+
+.doc img {
+  width: 100%;
+}
+
+.rename {
+  display: grid;
+  gap: var(--s-1);
+  margin-top: var(--s-5);
+}
+
+.rename__old {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  font-variant-ligatures: none;
+  text-decoration: line-through 1px;
+}
+
+.rename__new {
+  font-size: clamp(0.9375rem, 0.88rem + 0.25vw, 1.0625rem);
+  line-height: 1.6;
+}
+
+/* Before and after: six rename slips. */
+.examples {
+  padding: var(--section-y) var(--page-pad);
+  border-top: var(--hairline);
+}
+
+.section__lede {
+  margin-top: var(--s-3);
+  color: var(--ink-2);
+  font-size: 1.0625rem;
+}
+
+.slips {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+  margin: var(--s-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: var(--s-5) var(--s-6);
+  border: var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--sheet);
+}
+
+.slip__old {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  font-variant-ligatures: none;
+  overflow-wrap: anywhere;
+}
+
+.slip__new {
+  font-size: clamp(0.9375rem, 0.88rem + 0.3vw, 1.125rem);
+  line-height: 1.6;
+}
+
+.slip__flag {
+  color: var(--ochre);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* How it works: tabs */
+.workflow {
+  padding: var(--section-y) var(--page-pad);
+  border-block: var(--hairline);
+  background: var(--sheet);
+}
+
+.workflow__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-6);
+  margin-bottom: var(--s-8);
+}
+
+.tabs {
+  display: inline-flex;
+  border-bottom: var(--hairline-strong);
+}
+
+.tab {
+  min-height: 44px;
+  padding: 0 var(--s-5);
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab[aria-selected="true"] {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+}
+
+.panel p {
+  max-width: 62ch;
+  margin-bottom: var(--s-6);
+  color: var(--ink-2);
+  font-size: 1.0625rem;
+}
+
+.panel + .panel {
+  margin-top: var(--s-12);
+}
+
+/* main.ts adds .tabs-ready once the tabs work; until then every panel shows. */
+.tabs-ready .panels {
+  display: grid;
+}
+
+.tabs-ready .panel {
+  grid-area: 1 / 1;
+  margin-top: 0;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.tabs-ready .panel.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.frame {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--sheet);
+}
+
+.frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+}
+
+/* The extraction render keeps its own proportions so no field is cropped. */
+.frame--doc {
+  aspect-ratio: auto;
+  box-shadow: var(--sheet-offset);
+}
+
+.frame--doc img {
+  height: auto;
+}
+
+/* Safety checks: four cells at every width. */
+.safety {
+  padding: var(--section-y) var(--page-pad);
+}
+
+.safety h2 {
+  margin-bottom: var(--s-8);
+}
+
+.bento {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-4);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-width: 0;
+  padding: var(--s-8);
+  border: var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--sheet);
+}
+
+.cell p {
+  max-width: 46ch;
+  color: var(--ink-2);
+}
+
+.cell:nth-child(1),
+.cell:nth-child(4) {
+  grid-column: span 2;
+}
+
+.cell--image {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: start;
+  gap: var(--s-6);
+  padding-right: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.cell__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding-bottom: var(--s-8);
+}
+
+.frame--cell {
+  aspect-ratio: 4 / 3;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: var(--radius) 0 0 0;
+}
+
+.cell--marker {
+  justify-content: flex-end;
+  border-color: var(--marker-edge);
+  background: var(--marker);
+  color: var(--on-marker);
+}
+
+.cell--marker p,
+.cell--marker code {
+  color: var(--on-marker);
+}
+
+/* Install */
+.install {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--s-8) clamp(var(--s-8), 5vw, var(--s-16));
+  padding: var(--section-y) var(--page-pad);
+  border-block: var(--hairline);
+  background: var(--sunk);
+}
+
+.install__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.install__text p {
+  max-width: 44ch;
+  color: var(--ink-2);
+  font-size: 1.0625rem;
+}
+
+.install__commands {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+.cmd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-2) var(--s-4);
+  padding: var(--s-4) var(--s-5) var(--s-5);
+  border: var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--sheet);
+}
+
+.cmd figcaption {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.cmd pre {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  /* Commands keep their real line breaks; a long one scrolls inside its own
+     block rather than breaking mid-flag. */
+  white-space: pre;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.copy {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 32px;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  background: var(--sheet);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.copy:hover {
+  border-color: var(--ink);
+}
+
+/* FAQ */
+.faq {
+  padding: var(--section-y) var(--page-pad);
+}
+
+.faq h2 {
+  margin-bottom: var(--s-6);
+}
+
+.faq__list {
+  max-width: 760px;
+  border-top: 1px solid var(--ink);
+}
+
+.faq details {
+  border-bottom: var(--hairline);
+}
+
+.faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-height: 56px;
+  padding: var(--s-3) 0;
+  cursor: pointer;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  list-style: none;
+}
+
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq summary::after {
+  content: "+";
+  flex: none;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 400;
+  transition: transform var(--dur) var(--ease);
+}
+
+.faq details[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.faq details p {
+  max-width: 62ch;
+  padding-bottom: var(--s-5);
+  color: var(--ink-2);
+}
+
+/* Footer */
+.footer {
+  border-top: var(--hairline);
+}
+
+.footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4) var(--s-8);
+  padding: var(--s-8) var(--page-pad);
+  color: var(--muted);
+  font-size: var(--text-md);
+}
+
+.brand--small {
+  font-size: 1.0625rem;
+}
+
+.footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-6);
+  margin-left: auto;
+}
+
+.footer__links a {
+  color: var(--ink-2);
+}
+
+/* Breakpoints */
+@media (min-width: 900px) {
+  .slips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 899px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cell:nth-child(1),
+  .cell:nth-child(4) {
+    grid-column: auto;
+  }
+
+  .cell--image {
+    grid-template-columns: minmax(0, 1fr);
+    padding-left: 0;
+  }
+
+  .cell--image .cell__copy {
+    padding: 0 var(--s-8);
+  }
+
+  .frame--cell {
+    margin-left: var(--s-8);
+  }
+
+  .install {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 599px) {
+  .bento {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cell {
+    padding: var(--s-6);
+  }
+
+  .cell--image {
+    padding: var(--s-6) 0 0;
+  }
+
+  .cell--image .cell__copy {
+    padding: 0 var(--s-6);
+  }
+
+  .frame--cell {
+    margin-left: var(--s-6);
+  }
+
+  .slip {
+    padding: var(--s-4) var(--s-5);
+  }
+
+  .tabs {
+    width: 100%;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 0 var(--s-2);
+  }
+
+  .footer__links {
+    margin-left: 0;
+  }
+}
+
+/* Motion: only with no reduced-motion preference, only transform and opacity. */
+@media (prefers-reduced-motion: no-preference) {
+  .btn:active,
+  .copy:active,
+  .tab:active {
+    transform: translateY(1px);
+  }
+
+  /* (a) Hero load-in, finished within 600ms. */
+  .hero__title,
+  .hero__sub,
+  .hero__actions,
+  .hero__figure {
+    animation: tour-rise 420ms var(--ease-out) both;
+  }
+
+  .hero__sub {
+    animation-delay: 60ms;
+  }
+
+  .hero__actions {
+    animation-delay: 120ms;
+  }
+
+  .hero__figure {
+    animation-delay: 180ms;
+  }
+
+  /* (b) Marker sweep: a bar behind each part grows from the left. */
+  .rename__new .hl,
+  .slips.is-armed .hl {
+    position: relative;
+    background-image: none;
+  }
+
+  .rename__new .hl::before,
+  .slips.is-armed .hl::before {
+    content: "";
+    position: absolute;
+    inset: 14% 0 10%;
+    z-index: -1;
+    background: var(--marker-wash);
+    transform-origin: left center;
+  }
+
+  .rename__new .hl::before {
+    animation: tour-sweep 340ms var(--ease-out) calc(600ms + var(--i) * 70ms) both;
+  }
+
+  .slips.is-armed .hl::before {
+    transform: scaleX(0);
+    transition: transform 340ms var(--ease-out) calc(120ms + var(--i) * 70ms);
+  }
+
+  .slips.is-armed .is-swept .hl::before {
+    transform: none;
+  }
+
+  /* (c) Screenshots and extraction images reveal on scroll. */
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: tour-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 70%;
+    }
+  }
+
+  .reveal-fallback .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 520ms var(--ease-out), transform 520ms var(--ease-out);
+  }
+
+  .reveal-fallback .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* (d) Tab panels cross-fade. */
+  .tabs-ready .panel {
+    transition: opacity 260ms var(--ease), visibility 0s linear 260ms;
+  }
+
+  .tabs-ready .panel.is-active {
+    transition: opacity 260ms var(--ease) 60ms, visibility 0s;
+  }
+}
+
+@keyframes tour-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes tour-sweep {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes tour-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}

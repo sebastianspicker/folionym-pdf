@@ -32,6 +32,7 @@
 
 .button:active:not(:disabled) {
   background: var(--sunk);
+  transform: translateY(1px);
 }
 
 .button:disabled {
@@ -41,18 +42,17 @@
 }
 
 .button--primary {
-  border-color: var(--verdigris);
-  background: var(--verdigris);
-  color: var(--on-verdigris);
+  border-color: var(--marker-edge);
+  background: var(--marker);
+  color: var(--on-marker);
 }
 
 .button--primary:hover:not(:disabled) {
-  border-color: var(--verdigris-deep);
-  background: var(--verdigris-deep);
+  background: var(--marker-deep);
 }
 
 .button--primary:active:not(:disabled) {
-  background: var(--verdigris-ink);
+  background: var(--marker-deep);
 }
 
 .button--primary:disabled {
@@ -110,9 +110,10 @@
   padding: 2px 0;
   border: 0;
   background: none;
-  color: var(--verdigris-ink);
+  color: var(--ink);
   font-weight: 600;
   text-decoration: underline;
+  text-decoration-color: var(--marker-ink);
   text-decoration-thickness: 1px;
   text-underline-offset: 4px;
 }
@@ -169,7 +170,7 @@
 
 .input:focus-visible,
 .select:focus-visible {
-  border-color: var(--verdigris);
+  border-color: var(--focus);
 }
 
 .select {
@@ -243,12 +244,12 @@
 }
 
 .switch-input:checked + .switch-control {
-  border-color: var(--verdigris);
-  background: var(--verdigris);
+  border-color: var(--marker-edge);
+  background: var(--marker);
 }
 
 .switch-input:checked + .switch-control::after {
-  background: var(--on-verdigris);
+  background: var(--on-marker);
   transform: translateX(14px);
 }
 
@@ -277,7 +278,7 @@
   width: 5px;
   height: 9px;
   margin-top: -2px;
-  border: solid var(--on-verdigris);
+  border: solid var(--on-marker);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg) scale(0);
   transition: transform var(--dur-fast) var(--ease);
@@ -288,8 +289,8 @@
 }
 
 .checkbox:checked {
-  border-color: var(--verdigris);
-  background: var(--verdigris);
+  border-color: var(--marker-edge);
+  background: var(--marker);
 }
 
 .checkbox:checked::after {
@@ -370,7 +371,7 @@
 
 .status--ready,
 .status--renamed {
-  --status-ink: var(--verdigris);
+  --status-ink: var(--marker-ink);
 }
 
 .status--review {
@@ -441,7 +442,7 @@
 .progress span {
   position: absolute;
   inset: 0;
-  background: var(--verdigris);
+  background: var(--marker-ink);
   transform-origin: left;
   transform: scaleX(var(--progress, 0));
   transition: transform var(--dur) var(--ease);

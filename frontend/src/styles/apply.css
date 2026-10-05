@@ -18,9 +18,9 @@
 
 .result-heading h1 {
   font-size: var(--text-2xl);
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.05;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
 }
 
 .result-heading p {
@@ -30,51 +30,53 @@
   font-size: 1rem;
 }
 
-/* The tally: five counts on one rule, the way a register closes a page. */
+.result-demo-note {
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--ochre);
+  font-size: var(--text-sm) !important;
+}
+
+/* The tally: only the outcomes that happened, set as figures on one rule,
+   the way a register closes a page. */
 .tally {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4) var(--s-12);
+  padding: var(--s-5) 0;
   border-top: 1px solid var(--ink);
   border-bottom: var(--hairline);
 }
 
 .tally-cell {
   display: flex;
-  flex-direction: column-reverse;
-  gap: var(--s-1);
-  padding: var(--s-4) var(--s-4) var(--s-4) 0;
-}
-
-.tally-cell + .tally-cell {
-  padding-left: var(--s-4);
-  border-left: var(--hairline);
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: var(--s-2);
 }
 
 .tally-cell dt {
-  font-size: var(--text-sm);
-  color: var(--muted);
+  font-size: 1rem;
+  color: var(--ink-2);
 }
 
 .tally-cell dd {
-  font-family: var(--serif);
+  font-family: var(--mono);
   font-size: var(--text-2xl);
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1;
   font-variant-numeric: lining-nums tabular-nums;
   color: var(--ink);
 }
 
 .tally-cell--renamed dd {
-  color: var(--verdigris);
+  color: var(--marker-ink);
 }
 
 .tally-cell--failed dd {
   color: var(--madder);
 }
 
-.tally-cell.is-zero dd {
-  color: var(--muted);
-}
 
 /* Per-file report */
 .result-list {
@@ -177,8 +179,7 @@
 .result-list > .table-empty {
   border-bottom: var(--hairline);
   background: var(--sheet);
-  font-family: var(--serif);
-  font-style: italic;
+  font-family: var(--sans);
   color: var(--muted);
 }
 
@@ -206,16 +207,7 @@
   }
 
   .tally {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .tally-cell:nth-child(4) {
-    padding-left: 0;
-    border-left: 0;
-  }
-
-  .tally-cell:nth-child(n + 4) {
-    border-top: var(--hairline);
+    gap: var(--s-3) var(--s-6);
   }
 
   .tally-cell dd {

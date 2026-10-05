@@ -56,6 +56,7 @@ export function Modal({
   footer,
   onClose,
   wide = false,
+  sheet = false,
 }: {
   open: boolean;
   title: string;
@@ -64,6 +65,8 @@ export function Modal({
   footer?: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  /** Rises from the bottom edge on small screens instead of centring. */
+  sheet?: boolean;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLElement>(null);
@@ -74,11 +77,11 @@ export function Modal({
     <div
       aria-labelledby={titleId}
       aria-modal="true"
-      className="modal-layer"
+      className={`modal-layer ${sheet ? "modal-layer--sheet" : ""}`}
       onMouseDown={(event) => closeFromBackdrop(event, onClose)}
       role="dialog"
     >
-      <section className={`modal ${wide ? "modal--wide" : ""}`} ref={modalRef}>
+      <section className={`modal ${wide ? "modal--wide" : ""} ${sheet ? "modal--sheet" : ""}`} ref={modalRef}>
         <header className="modal__header">
           <div>
             <h2 id={titleId}>{title}</h2>

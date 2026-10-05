@@ -35,7 +35,7 @@ export function ApplyReportLedger({ items }: { items: ApplyItem[] }) {
   return (
     <section aria-labelledby="report-title" className="result-list">
       <header className="result-list__head">
-        <h2 id="report-title">Every file, one line each</h2>
+        <h2 id="report-title">All files</h2>
         <div aria-label="Show outcomes" className="result-filters" role="group">
           {reportFilters
             .filter(({ status }) => status === "all" || status === filter || counts[status] > 0)
@@ -66,7 +66,10 @@ export function ApplyReportLedger({ items }: { items: ApplyItem[] }) {
               {item.target_name ? (
                 <code className="name name--to filename">
                   <span className="visually-hidden">{item.status === "renamed" ? "renamed to " : "proposed "}</span>
-                  <Breakable text={item.target_name} />
+                  {/* A written name carries the marker: this is what changed on disk. */}
+                  <span className={item.status === "renamed" ? "highlight" : undefined}>
+                    <Breakable text={item.target_name} />
+                  </span>
                 </code>
               ) : (
                 <span className="name name--none">No new name</span>

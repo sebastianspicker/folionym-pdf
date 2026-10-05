@@ -64,15 +64,15 @@ const demoItems: PreviewItem[] = [
     id: "demo-invoice",
     current_name: "scan_0047.pdf",
     source_path: `${DEMO_SOURCE}/scan_0047.pdf`,
-    proposed_name: "20240115-invoice-acme-web-hosting-129-00-eur.pdf",
+    proposed_name: "20240115-invoice-brightwell-hosting-129-00-eur.pdf",
     status: "ready",
     included: true,
     reason:
-      "Invoice INV-2024-0117 for 129,00 € dated 15 Jan 2024 was found on page 1; Acme Web Hosting matched the vendor rule.",
+      "Invoice INV-2024-0117 for 129,00 € dated 15 Jan 2024 was found on page 1; Brightwell Hosting matched the vendor rule.",
     size: 188_416,
     modified_at: "2024-01-15T08:12:00Z",
     metadata: {
-      producer: "Acme Billing 4.2",
+      producer: "Brightwell Billing 4.2",
       invoice_id: "INV-2024-0117",
       pages: 2,
     },
