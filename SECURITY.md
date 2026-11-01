@@ -56,10 +56,16 @@ literal loopback IP addresses.
 
 ## Local browser frontend
 
-`folionym-web` binds only to `127.0.0.1`. Its API requires a process-local,
-HTTP-only same-site cookie, a recognized loopback `Host` header, same-origin
-mutations, and JSON request bodies. Responses set a restrictive Content Security
-Policy and disable framing. The folder navigator returns directory names and
+`folionym-web` binds only to `127.0.0.1`. At launch it generates a random token
+and prints a link containing it; the session cookie is issued only to a request
+that presents that token, so other local programs that merely reach the port
+cannot obtain one. The token works once, and the cookie is a separate secret.
+The URL is passed to the system browser opener, so the token is briefly visible
+in the process list to other local users; once the browser has used it, a copied
+link opens no second session. Its API requires
+that HTTP-only same-site cookie, a recognized loopback `Host` header,
+same-origin mutations, and JSON request bodies. Responses set a restrictive
+Content Security Policy and disable framing. The folder navigator returns directory names and
 direct PDF counts to the local browser, not PDF contents.
 
 The browser frontend does not make a configured non-loopback model endpoint

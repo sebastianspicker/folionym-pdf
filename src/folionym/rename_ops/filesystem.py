@@ -10,6 +10,7 @@ import stat
 from collections.abc import Callable
 from pathlib import Path
 
+from ..infrastructure.file_metadata import copy_file_metadata, rename_no_replace
 from ..infrastructure.files import open_directory_no_follow, open_regular_file_no_follow
 from .options import ExpectedSourceIdentity
 
@@ -34,6 +35,7 @@ def _copy_fd_to_fd(source_fd: int, target_fd: int) -> os.stat_result:
     if os.name != "nt":
         os.fchmod(target_fd, stat.S_IMODE(source_status.st_mode))
         os.utime(target_fd, ns=(source_status.st_atime_ns, source_status.st_mtime_ns))
+        copy_file_metadata(source_fd, target_fd)
     return source_status
 
 
@@ -148,6 +150,15 @@ def _rename_without_overwrite(
             directory_fd=directory_fd,
         )
         if linked_identity is None:
+            if _rename_in_place_without_overwrite(
+                file_path,
+                target,
+                source_fd,
+                source_identity,
+                expected_identity=expected_identity,
+                directory_fd=directory_fd,
+            ):
+                return
             _copy_to_reserved_target_then_unlink(
                 file_path,
                 target,
@@ -175,6 +186,28 @@ def _rename_without_overwrite(
             os.close(directory_fd)
         if owns_source_fd:
             os.close(source_fd)
+
+
+def _rename_in_place_without_overwrite(  # noqa: PLR0913 - pinned identities remain explicit
+    file_path: Path,
+    target: Path,
+    source_fd: int,
+    source_identity: os.stat_result,
+    *,
+    expected_identity: ExpectedSourceIdentity | None,
+    directory_fd: int,
+) -> bool:
+    """Rename atomically keeping the inode (and its xattrs); False when unsupported."""
+    if not rename_no_replace(directory_fd, file_path.name, target.name):
+        return False
+    # ctime is not compared: a rename changes it on some filesystems.
+    if _directory_entry_matches_identity(target.name, directory_fd, source_identity) and _identity_matches_expected(
+        os.fstat(source_fd), expected_identity
+    ):
+        return True
+    with contextlib.suppress(OSError):
+        rename_no_replace(directory_fd, target.name, file_path.name)
+    raise OSError(errno.EBUSY, f"Source changed while renaming: {file_path}")
 
 
 def _try_hard_link_without_overwrite(

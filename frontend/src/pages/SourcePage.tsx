@@ -107,7 +107,7 @@ export function SourcePage({
     }
   };
 
-  const localOnly = isLocalEndpoint(settings);
+  const localOnly = isLocalEndpoint(settings, bootstrap.fallback_endpoint_external);
 
   return (
     <AppChrome
@@ -298,8 +298,10 @@ export function SourcePage({
             <SummaryRow
               label="Model"
               value={
-                settings.use_llm
-                  ? `${settings.llm_model || "Configured model"}, ${localOnly ? "loopback endpoint" : "external endpoint"}`
+                settings.use_llm || settings.vision_first || settings.use_vision_fallback
+                  ? `${settings.llm_model || "Configured model"}${settings.use_llm ? "" : " (vision only)"}, ${
+                      localOnly ? "loopback endpoint" : "external endpoint"
+                    }`
                   : "None. Rules and heuristics only"
               }
             />

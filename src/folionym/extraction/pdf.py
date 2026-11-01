@@ -513,7 +513,7 @@ def _ocr_text_or_original(
         )
         if text_ocr is not None:
             return text_ocr
-    except (RuntimeError, OSError, ValueError) as exc:
+    except (RuntimeError, OSError, ValueError, ocrmypdf.exceptions.ExitCodeException) as exc:
         logger.warning("OCR failed for %s: %s. Using original extraction.", request.path, exc)
     finally:
         _remove_ocr_temp_path(tmp)
@@ -532,6 +532,8 @@ def _run_ocr_to_temp(ocrmypdf: Any, path: Path, tmp: Path, *, language: str) -> 
         str(path),
         str(tmp),
         language=_ocr_language_code(language),
+        skip_text=True,  # OCR only pages without text; the default aborts on any text layer
+        progress_bar=False,  # Folionym reports its own progress
     )
     # ocrmypdf typically renames its own temp output into `tmp`, creating a new inode
     # with umask-based permissions. Restore 0600 so the OCR output isn't world-readable.

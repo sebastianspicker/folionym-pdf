@@ -10,11 +10,7 @@ from pathlib import Path
 
 from ..infrastructure.files import open_regular_file_no_follow
 from .backups import _write_backup
-from .filesystem import (
-    _copy_to_reserved_target_then_unlink,
-    _rename_without_overwrite,
-    _validate_expected_identity,
-)
+from .filesystem import _rename_without_overwrite, _validate_expected_identity
 from .options import (
     MAX_RENAME_RETRIES,
     RenameApplyOptions,
@@ -98,7 +94,7 @@ def _run_rename_attempts(
         try:
             return _apply_rename_attempt(retry_context.file_path, state, options, source_fd=source_fd)
         except (FileExistsError, OSError) as error:
-            outcome = _handle_rename_attempt_error(retry_context, state, options, error, source_fd=source_fd)
+            outcome = _handle_rename_attempt_error(retry_context, state, options, error)
             if not isinstance(outcome, RenameAttemptState):
                 return outcome
             state = outcome
@@ -153,8 +149,6 @@ def _handle_rename_attempt_error(
     state: RenameAttemptState,
     options: RenameApplyOptions,
     error: FileExistsError | OSError,
-    *,
-    source_fd: int | None,
 ) -> RenameAttemptState | tuple[bool, Path]:
     """Translate an attempt error into a retry candidate, result, or raised failure."""
     if _is_target_exists_error(error):
@@ -162,8 +156,6 @@ def _handle_rename_attempt_error(
     if _is_filename_too_long_error(error):
         message = f"Filename too long: {state.target}. Shorten the summary or keywords."
         raise OSError(errno.ENAMETOOLONG, message) from error
-    if error.errno == errno.EXDEV:
-        return _handle_cross_filesystem_rename(retry_context.file_path, state, options, source_fd=source_fd)
     raise error
 
 
@@ -220,26 +212,6 @@ def _is_target_exists_error(exc: BaseException) -> bool:
 def _is_filename_too_long_error(error: OSError) -> bool:
     """Return whether an OS error reports an overlong filename."""
     return error.errno == errno.ENAMETOOLONG
-
-
-def _handle_cross_filesystem_rename(
-    file_path: Path,
-    state: RenameAttemptState,
-    options: RenameApplyOptions,
-    *,
-    source_fd: int | None,
-) -> tuple[bool, Path]:
-    """Complete a cross-filesystem rename through the guarded copy fallback."""
-    if options.dry_run:
-        return True, state.target
-    _copy_to_reserved_target_then_unlink(
-        file_path,
-        state.target,
-        source_fd,
-        expected_identity=options.expected_source_identity,
-    )
-    _notify_rename_success(options.on_success, file_path, state.target, state.current_base)
-    return True, state.target
 
 
 def _notify_rename_success(

@@ -15,7 +15,7 @@ _INVOICE_ID_PATTERNS = [
     re.compile(
         r"\b(?:rechnungsnummer|rechnung\s*(?:nr\.?|nummer|#)|invoice\s*(?:no\.?|number|#|id)|"
         r"bill\s*(?:no\.?|number|#)|order\s*(?:no\.?|number)|auftragsnummer|bestellnummer|belegnummer|reference\s*no\.?)"
-        r"\s*[:\s#-]*\s*" + _INVOICE_ID_VALUE + r"\b",
+        r"[\s:#-]*" + _INVOICE_ID_VALUE + r"\b",
         re.IGNORECASE,
     ),
     re.compile(r"\b(?:inv|rechnung|rg|ref)\s*[#:-]?\s*(" + _INVOICE_ID_VALUE_SHORTHAND + r")\b", re.IGNORECASE),
@@ -23,7 +23,7 @@ _INVOICE_ID_PATTERNS = [
 ]
 _AMOUNT_PATTERNS = [
     re.compile(
-        r"\b(?:betrag|summe|total|gesamt|amount|invoice\s*total)\s*[:\s]*"
+        r"\b(?:betrag|summe|total|gesamt|amount|invoice\s*total)[\s:]*"
         r"([\d.,]+)\s*(?:€|EUR|eur)?\b",
         re.IGNORECASE,
     ),

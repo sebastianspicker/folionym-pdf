@@ -66,9 +66,20 @@ def chat_completions_url(completions_url: str) -> str:
     # appear earlier in a proxy path or hostname.
     if path.endswith("/v1/completions"):
         path = path[: -len("/v1/completions")] + "/v1/chat/completions"
+    elif path.endswith("/v1"):
+        path += "/chat/completions"
     elif not path.endswith("/v1/chat/completions"):
         path += "/v1/chat/completions"
     return urlunsplit((parsed.scheme, parsed.netloc, path, parsed.query, ""))
+
+
+def text_completions_url(completions_url: str) -> str:
+    """Complete an OpenAI-style ``…/v1`` base URL to ``…/v1/completions``; keep any other URL."""
+    parsed = urlsplit((completions_url or "").strip())
+    path = parsed.path.rstrip("/")
+    if not path.endswith("/v1"):
+        return completions_url
+    return urlunsplit((parsed.scheme, parsed.netloc, path + "/completions", parsed.query, ""))
 
 
 class EndpointProbeError(Exception):
@@ -96,7 +107,7 @@ def probe_completions_endpoint(url: str, model: str, *, use_chat_api: bool = Fal
             "temperature": 0.0,
         }
     else:
-        probe_url = url
+        probe_url = text_completions_url(url)
         payload = {"model": model, "prompt": "ping", "max_tokens": 1, "temperature": 0.0}
     try:
         with requests.Session() as session:
@@ -168,7 +179,9 @@ class HttpLLMBackend:
             payload["max_tokens"] = max_tokens
         if response_format is not None:
             payload["response_format"] = response_format
-        resp = self.session.post(self.base_url, json=payload, timeout=self.timeout_s, allow_redirects=False)
+        resp = self.session.post(
+            text_completions_url(self.base_url), json=payload, timeout=self.timeout_s, allow_redirects=False
+        )
         resp.raise_for_status()
         data = resp.json()
         if not isinstance(data, dict):

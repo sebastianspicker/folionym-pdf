@@ -8,9 +8,11 @@ the public ``folionym.renamer`` facade use it so their output is identical.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import NoReturn
 
 from rich.console import Console
 from rich.progress import BarColumn, Progress, ProgressColumn, TextColumn, TimeElapsedColumn
@@ -47,6 +49,12 @@ def _edit_prompt_text(edit_default_base: str | None) -> str:
     return f"New filename (without path){default}: "
 
 
+def _stop_interrupted() -> NoReturn:
+    """End an interactive review on Ctrl+C; renames already applied are in the rename log."""
+    print("Interrupted.", file=sys.stderr)
+    raise SystemExit(130)
+
+
 def _strip_pdf_suffix(value: str, suffix: str) -> str:
     """Remove a matching PDF suffix case-insensitively."""
     return value[: -len(suffix)] if suffix and value.lower().endswith(suffix.lower()) else value
@@ -64,16 +72,20 @@ def _interactive_rename_prompt(
             target_name = escape_terminal_text(current_target.name)
             prompt = f"Rename '{source_name}' to '{target_name}'? (y/n/e=edit, default y): "
             reply = input(prompt).strip().lower() or "y"
-        except EOFError, KeyboardInterrupt:
+        except EOFError:
             return ("n", current_base)
+        except KeyboardInterrupt:
+            _stop_interrupted()
         if reply == "n":
             return ("n", current_base)
         if reply != "e":
             return ("y", current_base)
         try:
             edited = input(_edit_prompt_text(edit_default_base)).strip()
-        except EOFError, KeyboardInterrupt:
+        except EOFError:
             continue
+        except KeyboardInterrupt:
+            _stop_interrupted()
         edited = edited or edit_default_base or ""
         if not edited:
             continue

@@ -28,3 +28,14 @@ def external_llm_endpoint(config: RenamerConfig) -> str | None:
         return None
     endpoint = validate_http_endpoint(llm_url)
     return None if endpoint.is_loopback else endpoint.url
+
+
+def fallback_endpoint_is_external() -> bool:
+    """Return whether the endpoint used when no URL is configured is off this machine."""
+    llm_url = env_str(ENV_LLM_URL)
+    if llm_url is None:
+        return False
+    try:
+        return not validate_http_endpoint(llm_url).is_loopback
+    except ValueError:
+        return True

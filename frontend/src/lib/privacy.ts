@@ -56,10 +56,12 @@ function isLoopbackUrl(value: string): boolean {
   }
 }
 
-/** True when model assistance is off or the configured endpoint is loopback. */
-export function isLocalEndpoint(settings: {
-  use_llm: boolean;
-  llm_url: string;
-}): boolean {
-  return !settings.use_llm || !settings.llm_url || isLoopbackUrl(settings.llm_url);
+/** True when no model or vision request is made, or the endpoint it would use is loopback. */
+export function isLocalEndpoint(
+  settings: { use_llm: boolean; vision_first: boolean; use_vision_fallback: boolean; llm_url: string },
+  fallbackEndpointExternal = false,
+): boolean {
+  if (!settings.use_llm && !settings.vision_first && !settings.use_vision_fallback) return true;
+  if (settings.llm_url.trim()) return isLoopbackUrl(settings.llm_url);
+  return !fallbackEndpointExternal;
 }

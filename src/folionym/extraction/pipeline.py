@@ -17,6 +17,7 @@ from ..settings.models import RenamerConfig
 from .models import ExtractionFunctions, ExtractionResult, VisionAttempt, VisionExtractionRequest
 from .pdf import (
     DEFAULT_MAX_CONTENT_TOKENS,
+    NoTextExtractedError,
     pdf_first_page_to_image_payload,
     pdf_to_text,
     pdf_to_text_with_ocr,
@@ -70,7 +71,8 @@ def _try_vision_extraction(request: VisionExtractionRequest) -> str | None:
         ),
     )
     if vision_text:
-        return sanitize_fn(vision_text)
+        # The answer is filename-shaped; naming needs words, so "_" becomes a space again.
+        return sanitize_fn(vision_text).replace("_", " ")
     return None
 
 
@@ -196,12 +198,21 @@ def _extract_primary_or_fallback(
     tried_vision: bool,
 ) -> ExtractionResult:
     """Run primary text or OCR extraction, then optional vision fallback."""
-    content, primary_strategy = _extract_primary_content(
-        path,
-        config,
-        pdf_to_text_fn=extraction_fns.pdf_to_text_fn,
-        pdf_to_text_with_ocr_fn=extraction_fns.pdf_to_text_with_ocr_fn,
-    )
+    try:
+        content, primary_strategy = _extract_primary_content(
+            path,
+            config,
+            pdf_to_text_fn=extraction_fns.pdf_to_text_fn,
+            pdf_to_text_with_ocr_fn=extraction_fns.pdf_to_text_with_ocr_fn,
+        )
+    except NoTextExtractedError:
+        # An image-only PDF is what vision fallback is for; it stays skipped unless vision reads it.
+        if not _should_try_vision_fallback(config, tried_vision, 0):
+            raise
+        vision_text = _run_vision_fallback(path, config, extraction_fns, client, content_length=0)
+        if vision_text is None:
+            raise
+        return ExtractionResult(vision_text, used_vision=True)
     content_length = len(content.strip())
     if _should_try_vision_fallback(config, tried_vision, content_length):
         fallback = _run_vision_fallback(path, config, extraction_fns, client, content_length=content_length)

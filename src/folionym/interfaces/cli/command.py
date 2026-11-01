@@ -455,6 +455,7 @@ def _run_requested_operation(
     single_file: str | None,
 ) -> None:
     """Dispatch watch mode or one batch rename operation per resolved directory."""
+    _reject_per_run_outputs_across_runs(config, watch=bool(getattr(args, "watch", False)), dirs=dirs)
     if getattr(args, "watch", False):
         if len(dirs) > 1:
             raise SystemExit("Error: --watch supports only one directory. Use a single --dir.")
@@ -472,6 +473,27 @@ def _run_requested_operation(
             directory,
             config=config,
             files_override=_files_override_for(directory, single_file),
+        )
+
+
+def _reject_per_run_outputs_across_runs(config: RenamerConfig, *, watch: bool, dirs: list[str]) -> None:
+    """Refuse output files that each run rewrites when one command makes several runs."""
+    paths = config.output.paths
+    configured = [
+        flag
+        for flag, value in (
+            ("--plan-file", paths.plan_file_path),
+            ("--export-metadata", paths.export_metadata_path),
+            ("--summary-json", paths.summary_json_path),
+        )
+        if value
+    ]
+    several_dirs = len([directory for directory in dirs if directory]) > 1
+    if configured and (watch or several_dirs):
+        scope = "--watch" if watch else "several --dir folders"
+        raise SystemExit(
+            f"Error: {', '.join(configured)} would be rewritten for each run with {scope}, "
+            "keeping only the last one. Use one --dir without --watch for these files."
         )
 
 

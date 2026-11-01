@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..infrastructure.file_metadata import copy_file_metadata
 from ..infrastructure.files import open_regular_file_no_follow, read_regular_file_no_follow
 
 logger = logging.getLogger(__name__)
@@ -108,6 +109,11 @@ def _replace_nonempty_temp_pdf(temp_pdf: _MetadataTemp, pdf_path: Path, source_m
         raise OSError(f"Temporary PDF path changed before publication: {temp_pdf.path}")
     if os.name != "nt":
         os.fchmod(temp_pdf.fd, stat.S_IMODE(source_mode))
+        original_fd = open_regular_file_no_follow(pdf_path)
+        try:
+            copy_file_metadata(original_fd, temp_pdf.fd)
+        finally:
+            os.close(original_fd)
     else:
         os.chmod(temp_pdf.path, stat.S_IMODE(source_mode), follow_symlinks=False)
     # Atomic replace (os.replace is atomic on POSIX, best-effort on Windows).

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import string
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,7 @@ from .models import (
     _VALID_DATE_LOCALES,
     _VALID_DESIRED_CASES,
     _VALID_LANGUAGES,
+    WORKFLOW_PRESET_CHOICES,
     RenamerConfig,
     build_config_from_flat_dict,
     flat_field_defaults,
@@ -87,11 +89,16 @@ def _bool(value: Any, default: bool = False) -> bool:
         return value
     if isinstance(value, str):
         low = value.strip().lower()
-        if low in {"1", "true", "yes", "on"}:
+        if low in _TRUE_TEXT:
             return True
-        if low in {"0", "false", "no", "off", ""}:
+        if low in _FALSE_TEXT:
             return False
+        return default  # a typo such as "flase" must not switch a feature on
     return bool(value)
+
+
+_TRUE_TEXT = frozenset({"1", "true", "yes", "on"})
+_FALSE_TEXT = frozenset({"0", "false", "no", "off", ""})
 
 
 def _str(value: Any, default: str = "") -> str:
@@ -136,36 +143,12 @@ def _first_set(*values: Any) -> Any:
     return next((value for value in values if value not in (None, "")), None)
 
 
-def _text(value: Any, default: Any) -> str:
-    return _str(value, default)
-
-
 def _lower_text(value: Any, default: Any) -> str:
     return _str(value, default).lower()
 
 
-def _flag(value: Any, default: Any) -> bool:
-    return _bool(value, default)
-
-
-def _integer(value: Any, default: Any) -> int:
-    return _int_with_default(value, default)
-
-
 def _at_least_one(value: Any, default: Any) -> int:
     return max(1, _int_with_default(value, default))
-
-
-def _nonnegative_integer(value: Any, default: Any) -> int:
-    return _nonnegative_int_with_default(value, default)
-
-
-def _nonnegative_number(value: Any, default: Any) -> float:
-    return _nonnegative_float_with_default(value, default)
-
-
-def _number(value: Any, default: Any) -> float:
-    return _float_with_default(value, default)
 
 
 def _optional_number(value: Any, _default: Any) -> float | None:
@@ -215,58 +198,58 @@ _D = flat_field_defaults()
 _SETTINGS: dict[str, _Setting] = {
     # Output naming
     "language": _Setting(_lower_text, _D["language"]),
-    "desired_case": _Setting(_text, _D["desired_case"]),
-    "project": _Setting(_text, _D["project"]),
-    "version": _Setting(_text, _D["version"]),
+    "desired_case": _Setting(_str, _D["desired_case"]),
+    "project": _Setting(_str, _D["project"]),
+    "version": _Setting(_str, _D["version"]),
     "date_locale": _Setting(_lower_text, _D["date_locale"]),
-    "date_prefer_leading_chars": _Setting(_integer, _D["date_prefer_leading_chars"]),
+    "date_prefer_leading_chars": _Setting(_int_with_default, _D["date_prefer_leading_chars"]),
     "max_filename_chars": _Setting(_optional_positive_integer),
     # Heuristics; override and preference inputs are folded in by _apply_heuristic_policy
-    "min_heuristic_score_gap": _Setting(_number, _D["min_heuristic_score_gap"]),
-    "min_heuristic_score": _Setting(_number, _D["min_heuristic_score"]),
-    "title_weight_region": _Setting(_integer, _D["title_weight_region"]),
-    "title_weight_factor": _Setting(_number, _D["title_weight_factor"]),
+    "min_heuristic_score_gap": _Setting(_float_with_default, _D["min_heuristic_score_gap"]),
+    "min_heuristic_score": _Setting(_float_with_default, _D["min_heuristic_score"]),
+    "title_weight_region": _Setting(_int_with_default, _D["title_weight_region"]),
+    "title_weight_factor": _Setting(_float_with_default, _D["title_weight_factor"]),
     "max_score_per_category": _Setting(_optional_number),
-    "use_keyword_overlap_for_category": _Setting(_flag, _D["use_keyword_overlap_for_category"]),
+    "use_keyword_overlap_for_category": _Setting(_bool, _D["use_keyword_overlap_for_category"]),
     "category_display": _Setting(_lower_text, _D["category_display"]),
     "skip_llm_category_if_heuristic_score_ge": _Setting(_optional_number),
     "skip_llm_category_if_heuristic_gap_ge": _Setting(_optional_number),
-    "heuristic_suggestions_top_n": _Setting(_integer, _D["heuristic_suggestions_top_n"]),
-    "heuristic_score_weight": _Setting(_number, _D["heuristic_score_weight"]),
-    "use_constrained_llm_category": _Setting(_flag, _D["use_constrained_llm_category"]),
-    "heuristic_leading_chars": _Setting(_integer, _D["heuristic_leading_chars"]),
-    "heuristic_long_doc_chars_threshold": _Setting(_integer, _D["heuristic_long_doc_chars_threshold"]),
-    "heuristic_long_doc_leading_chars": _Setting(_integer, _D["heuristic_long_doc_leading_chars"]),
+    "heuristic_suggestions_top_n": _Setting(_int_with_default, _D["heuristic_suggestions_top_n"]),
+    "heuristic_score_weight": _Setting(_float_with_default, _D["heuristic_score_weight"]),
+    "use_constrained_llm_category": _Setting(_bool, _D["use_constrained_llm_category"]),
+    "heuristic_leading_chars": _Setting(_int_with_default, _D["heuristic_leading_chars"]),
+    "heuristic_long_doc_chars_threshold": _Setting(_int_with_default, _D["heuristic_long_doc_chars_threshold"]),
+    "heuristic_long_doc_leading_chars": _Setting(_int_with_default, _D["heuristic_long_doc_leading_chars"]),
     "heuristic_override_min_score": _Setting(_optional_number),
     "heuristic_override_min_gap": _Setting(_optional_number),
-    "no_heuristic_override": _Setting(_flag, False),
-    "prefer_llm_category": _Setting(_flag, _D["prefer_llm_category"]),
-    "prefer_heuristic": _Setting(_flag, False),
+    "no_heuristic_override": _Setting(_bool, False),
+    "prefer_llm_category": _Setting(_bool, _D["prefer_llm_category"]),
+    "prefer_heuristic": _Setting(_bool, False),
     # Extraction
-    "max_pages_for_extraction": _Setting(_integer, _D["max_pages_for_extraction"]),
+    "max_pages_for_extraction": _Setting(_int_with_default, _D["max_pages_for_extraction"]),
     "max_tokens_for_extraction": _Setting(_optional_positive_integer, env=ENV_MAX_TOKENS),
-    "use_ocr": _Setting(_flag, _D["use_ocr"]),
-    "use_structured_fields": _Setting(_flag, _D["use_structured_fields"]),
-    "use_pdf_metadata_for_date": _Setting(_flag, _D["use_pdf_metadata_for_date"]),
-    "full_text_extraction": _Setting(_flag, _D["full_text_extraction"]),
+    "use_ocr": _Setting(_bool, _D["use_ocr"]),
+    "use_structured_fields": _Setting(_bool, _D["use_structured_fields"]),
+    "use_pdf_metadata_for_date": _Setting(_bool, _D["use_pdf_metadata_for_date"]),
+    "full_text_extraction": _Setting(_bool, _D["full_text_extraction"]),
     # LLM backend and runtime
     "llm_base_url": _Setting(_optional_text, env=ENV_LLM_URL),
     "llm_model": _Setting(_optional_text, env=ENV_LLM_MODEL),
     "llm_timeout_s": _Setting(_optional_number, env=ENV_LLM_TIMEOUT),
     "llm_preset": _Setting(_optional_text),
-    "require_https": _Setting(_flag, _D["require_https"], env=ENV_REQUIRE_HTTPS, additive_env=True),
-    "use_llm": _Setting(_flag, _D["use_llm"]),
-    "lenient_llm_json": _Setting(_flag, _D["lenient_llm_json"]),
-    "simple_naming_mode": _Setting(_flag, _D["simple_naming_mode"]),
-    "use_single_llm_call": _Setting(_flag, _D["use_single_llm_call"]),
-    "llm_use_chat_api": _Setting(_flag, _D["llm_use_chat_api"]),
-    "llm_json_mode": _Setting(_flag, _D["llm_json_mode"]),
+    "require_https": _Setting(_bool, _D["require_https"], env=ENV_REQUIRE_HTTPS, additive_env=True),
+    "use_llm": _Setting(_bool, _D["use_llm"]),
+    "lenient_llm_json": _Setting(_bool, _D["lenient_llm_json"]),
+    "simple_naming_mode": _Setting(_bool, _D["simple_naming_mode"]),
+    "use_single_llm_call": _Setting(_bool, _D["use_single_llm_call"]),
+    "llm_use_chat_api": _Setting(_bool, _D["llm_use_chat_api"]),
+    "llm_json_mode": _Setting(_bool, _D["llm_json_mode"]),
     "llm_concurrency": _Setting(_at_least_one, _D["llm_concurrency"]),
     # LLM vision
-    "use_vision_fallback": _Setting(_flag, _D["use_vision_fallback"], env=ENV_USE_VISION_FALLBACK, additive_env=True),
-    "vision_fallback_min_text_len": _Setting(_integer, _D["vision_fallback_min_text_len"]),
+    "use_vision_fallback": _Setting(_bool, _D["use_vision_fallback"], env=ENV_USE_VISION_FALLBACK, additive_env=True),
+    "vision_fallback_min_text_len": _Setting(_int_with_default, _D["vision_fallback_min_text_len"]),
     "vision_model": _Setting(_optional_text),
-    "vision_first": _Setting(_flag, _D["vision_first"], env=ENV_VISION_FIRST, additive_env=True),
+    "vision_first": _Setting(_bool, _D["vision_first"], env=ENV_VISION_FIRST, additive_env=True),
     "vision_render_dpi": _Setting(_at_least_one, _D["vision_render_dpi"]),
     "vision_max_pixels": _Setting(_at_least_one, _D["vision_max_pixels"]),
     "vision_max_dimension_pixels": _Setting(_at_least_one, _D["vision_max_dimension_pixels"]),
@@ -275,18 +258,18 @@ _SETTINGS: dict[str, _Setting] = {
     "max_context_chars": _Setting(_optional_positive_integer, env=ENV_MAX_CONTENT_CHARS),
     "max_content_chars": _Setting(_optional_positive_integer, env=ENV_MAX_CONTENT_CHARS),
     "max_content_tokens": _Setting(_optional_positive_integer, env=ENV_MAX_CONTENT_TOKENS),
-    "use_cache": _Setting(_flag, _D["use_cache"]),
+    "use_cache": _Setting(_bool, _D["use_cache"]),
     "cache_dir": _Setting(_optional_path, env=ENV_CACHE_DIR),
-    "cache_max_memory_entries": _Setting(_nonnegative_integer, _D["cache_max_memory_entries"]),
-    "cache_max_memory_bytes": _Setting(_nonnegative_integer, _D["cache_max_memory_bytes"]),
-    "cache_max_disk_entries": _Setting(_nonnegative_integer, _D["cache_max_disk_entries"]),
-    "cache_max_disk_bytes": _Setting(_nonnegative_integer, _D["cache_max_disk_bytes"]),
-    "cache_ttl_s": _Setting(_nonnegative_number, _D["cache_ttl_s"]),
+    "cache_max_memory_entries": _Setting(_nonnegative_int_with_default, _D["cache_max_memory_entries"]),
+    "cache_max_memory_bytes": _Setting(_nonnegative_int_with_default, _D["cache_max_memory_bytes"]),
+    "cache_max_disk_entries": _Setting(_nonnegative_int_with_default, _D["cache_max_disk_entries"]),
+    "cache_max_disk_bytes": _Setting(_nonnegative_int_with_default, _D["cache_max_disk_bytes"]),
+    "cache_ttl_s": _Setting(_nonnegative_float_with_default, _D["cache_ttl_s"]),
     # Output templates, paths, and traversal
     "override_category_map": _Setting(_as_is, runtime_only=True),
     "filename_template": _Setting(_optional_text),
-    "use_timestamp_fallback": _Setting(_flag, _D["use_timestamp_fallback"]),
-    "timestamp_fallback_segment": _Setting(_text, _D["timestamp_fallback_segment"]),
+    "use_timestamp_fallback": _Setting(_bool, _D["use_timestamp_fallback"]),
+    "timestamp_fallback_segment": _Setting(_str, _D["timestamp_fallback_segment"]),
     "backup_dir": _Setting(_optional_path),
     "rename_log_path": _Setting(_optional_path),
     "export_metadata_path": _Setting(_optional_path),
@@ -294,21 +277,21 @@ _SETTINGS: dict[str, _Setting] = {
     "plan_file_path": _Setting(_optional_path),
     "rules_file": _Setting(_optional_path),
     "workers": _Setting(_at_least_one, _D["workers"]),
-    "recursive": _Setting(_flag, _D["recursive"]),
-    "max_depth": _Setting(_integer, _D["max_depth"]),
+    "recursive": _Setting(_bool, _D["recursive"]),
+    "max_depth": _Setting(_int_with_default, _D["max_depth"]),
     "include_patterns": _Setting(_as_is),
     "exclude_patterns": _Setting(_as_is),
     # Output mode, hooks, and progress
-    "dry_run": _Setting(_flag, _D["dry_run"]),
-    "skip_if_already_named": _Setting(_flag, _D["skip_if_already_named"]),
-    "interactive": _Setting(_flag, _D["interactive"]),
-    "manual_mode": _Setting(_flag, _D["manual_mode"], runtime_only=True),
-    "write_pdf_metadata": _Setting(_flag, _D["write_pdf_metadata"]),
+    "dry_run": _Setting(_bool, _D["dry_run"]),
+    "skip_if_already_named": _Setting(_bool, _D["skip_if_already_named"]),
+    "interactive": _Setting(_bool, _D["interactive"]),
+    "manual_mode": _Setting(_bool, _D["manual_mode"], runtime_only=True),
+    "write_pdf_metadata": _Setting(_bool, _D["write_pdf_metadata"]),
     "post_rename_hook": _Setting(_optional_text, env=ENV_POST_RENAME_HOOK),
     "stop_event": _Setting(_as_is, runtime_only=True),
-    "progress": _Setting(_flag, _D["progress"]),
-    "quiet_progress": _Setting(_flag, _D["quiet_progress"]),
-    "explain": _Setting(_flag, _D["explain"]),
+    "progress": _Setting(_bool, _D["progress"]),
+    "quiet_progress": _Setting(_bool, _D["quiet_progress"]),
+    "explain": _Setting(_bool, _D["explain"]),
 }
 
 
@@ -348,11 +331,38 @@ def _named_preset_values(preset: str) -> dict[str, Any]:
 def _preset_values(raw: Mapping[str, Any], file_defaults: Mapping[str, Any]) -> dict[str, Any]:
     """Merge the named workflow preset and the LLM hardware preset into the lowest-precedence layer."""
     preset = _str(_first_set(raw.get("preset"), file_defaults.get("preset")))
+    if preset and preset not in WORKFLOW_PRESET_CHOICES:
+        logger.warning("Ignoring unknown preset=%r; expected one of: %s", preset, ", ".join(WORKFLOW_PRESET_CHOICES))
     llm_preset = _string_or_none(_first_set(raw.get("llm_preset"), file_defaults.get("llm_preset")))
     effective = llm_preset if llm_preset in _LLM_PRESET_DEFAULTS else "apple-silicon"
     if llm_preset is not None and llm_preset != effective:
         logger.warning("Unknown llm_preset=%r; falling back to %r", llm_preset, effective)
     return {**_LLM_PRESET_DEFAULTS[effective], **_named_preset_values(preset)}
+
+
+_NUMBER_PARSERS: dict[Callable[[Any, Any], Any], Callable[[str], object]] = {
+    _int_with_default: int,
+    _nonnegative_int_with_default: int,
+    _at_least_one: int,
+    _float_with_default: float,
+    _nonnegative_float_with_default: float,
+}
+
+
+def _is_unparseable(coerce: Callable[[Any, Any], Any], value: Any) -> bool:
+    """Return whether a non-empty text value was rejected by a boolean or number coercion."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    if coerce is _bool:
+        return value.strip().lower() not in _TRUE_TEXT | _FALSE_TEXT
+    parse = _NUMBER_PARSERS.get(coerce)
+    if parse is None:
+        return False
+    try:
+        parse(value)
+    except ValueError:
+        return True
+    return False
 
 
 def _resolve_setting(
@@ -368,6 +378,8 @@ def _resolve_setting(
     env_value = env_str(setting.env, env) if setting.env and not setting.additive_env else None
     value = _first_set(raw.get(name), env_value, file_defaults.get(name), presets.get(name))
     resolved = setting.coerce(value, setting.default)
+    if _is_unparseable(setting.coerce, value):
+        logger.warning("Ignoring invalid %s=%r; using %r", name, value, resolved)
     if setting.additive_env and setting.env:
         return resolved or env_bool(setting.env, env)
     return resolved
@@ -405,7 +417,25 @@ def _validation_errors(kwargs: Mapping[str, Any]) -> list[str]:
         value = _str(kwargs.get(key), default).lower() if key != "desired_case" else _str(kwargs.get(key), default)
         if value not in choices:
             errors.append(f"{key}={value!r} must be one of: {', '.join(sorted(choices))}")
+    if template_error := _filename_template_error(kwargs.get("filename_template")):
+        errors.append(template_error)
     return errors
+
+
+def _filename_template_error(template: object) -> str | None:
+    """Reject malformed or positional filename templates once, before any file is processed."""
+    if not template:
+        return None
+    try:
+        parts = [(field, conversion) for _text, field, _spec, conversion in string.Formatter().parse(str(template))]
+    except ValueError as exc:
+        return f"filename_template is invalid: {exc}"
+    for field, conversion in parts:
+        if field is not None and (field == "" or field.isdigit()):
+            return "filename_template is invalid: use named fields such as {date} or {category}"
+        if conversion not in (None, "r", "s", "a"):
+            return f"filename_template is invalid: unknown conversion !{conversion}"
+    return None
 
 
 def build_config(

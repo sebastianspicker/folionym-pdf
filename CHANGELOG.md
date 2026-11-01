@@ -28,6 +28,15 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Changed
 
+- `--plan-file`, `--export-metadata` and `--summary-json` are refused together
+  with several `--dir` folders or `--watch`. Each folder, and each watched
+  file, is a separate run that rewrote these files, so they used to keep only
+  the last run.
+- `folionym-undo` exits with status 1 when an entry could not be reverted and
+  prints a one-line total of reverted, skipped and failed entries.
+- An unrecognised boolean in a config file or `FOLIONYM_*` variable (such as
+  `use_llm: flase`) keeps the default instead of counting as true. Values that
+  do not parse and unknown `preset` names are now named in a warning.
 - General CI runs automatically only for Dependabot-authored pull requests;
   ordinary builds remain available manually. Security scans retain their own
   triggers. Pages deployment requires a manual run on `main`.
@@ -121,8 +130,52 @@ candidate commit is tagged and published as a GitHub prerelease.
 - Added Ruff complexity guards (`C901`, `PLR0911`, `PLR0912`, `PLR0913`, and
   `PLR0915`) and aligned mypy with Python 3.14.
 
+### Security
+
+- `folionym-web` now opens a link with a single-use random token and issues its
+  session cookie, a separate secret, only to the first request that presents
+  it. Before, any local program could ask for the cookie and then use the whole
+  browser API. The link is also printed, for `--no-open` and the Vite dev
+  server.
+- Filenames no longer keep control characters (including C1), lone
+  surrogates, line separators or invisible format characters such as the
+  right-to-left override, which could make a new name display as a different
+  one. Unusual spaces become plain spaces; the zero-width non-joiner and
+  joiner used in Persian and Indic words are kept.
+
 ### Fixed
 
+- The filename date no longer comes from an 8-digit customer, invoice or order
+  number when the text also has a written date such as `12.03.2024`, and
+  dates with a two-digit year and two-digit day and month (`15.01.24`) are
+  read. Version or section numbers such as `1.2.15` are not taken as dates.
+- Vision fallback now runs for image-only PDFs instead of skipping them, and a
+  vision answer such as `INVOICE_AMAZON_2023-11-15` yields
+  `20231115-invoice` instead of a dated `document` name.
+- `--ocr` no longer stops the whole run when OCRmyPDF refuses a PDF (for
+  example one that already has a small text layer). Pages that already have
+  text are kept, only empty pages are recognised, and OCRmyPDF's own progress
+  bars are no longer printed.
+- Invoice-number extraction no longer slows down sharply on long runs of
+  blanks after a label such as "Rechnungsnummer".
+- A model URL ending in `/v1` (for example `http://127.0.0.1:11434/v1`) now
+  reaches `/v1/chat/completions` or `/v1/completions` instead of failing with
+  404 on every request.
+- A malformed `--template` (`{date`, `{0}`, `{date!x}`) is reported once when
+  the configuration is built instead of failing every file, and empty template
+  fields no longer leave doubled or trailing separators.
+- Keywords that differ only in case appear once in a filename.
+- Renames on volumes without hard links (exFAT, most SMB shares) now use an
+  atomic no-replace rename where the system offers one, and the copy fallback,
+  backups and `--write-pdf-metadata` keep extended attributes such as Finder
+  tags, plus the creation date on macOS.
+- Ctrl+C at an `--interactive` prompt stops the run (exit 130) instead of only
+  skipping the current file.
+- In the browser, an apply that was stopped after some files now opens its
+  report, a double click on Apply sends one request, an apply error is shown
+  above the list instead of replacing the page, the privacy label also counts
+  vision settings and `FOLIONYM_LLM_URL`, and the progress window no longer
+  moves keyboard focus away from "Stop" on every finished file.
 - Check Preview paths against resolved filesystem roots, including directory
   aliases, while retaining downstream source-symlink rejection.
 
@@ -216,6 +269,8 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Removed
 
+- The unused browser API route that downloaded a preview's rename log,
+  metadata export or summary file.
 - The obsolete GUI command alias and the former Python compatibility façade.
 - Local model-loading, automatic backend selection, embedding-assisted conflict
   resolution, and their retired configuration fields.

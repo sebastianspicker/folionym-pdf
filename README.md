@@ -43,7 +43,9 @@ YYYYMMDD-category-keywords-summary.pdf
 ```
 
 It can also build names from a template using date, project, category,
-keywords, summary, version, invoice ID, amount, and company fields.
+keywords, summary, version, invoice ID, amount, and company fields
+(`--template '{date}-{category}-{company}'`). An empty field drops its
+separator, and a malformed template is reported before any file is processed.
 
 - PDF text and metadata extraction with PyMuPDF
 - Heuristic classification of English and German documents using bundled category data
@@ -159,6 +161,8 @@ case, project and version that you did not pass as options or set in your
 `--config` file (press Enter to accept the default shown), asks for a directory
 if none was given, and then asks you to confirm each rename. Without
 `--interactive` the defaults are used, and a missing directory is an error.
+Ctrl+C at a rename prompt stops the run (exit status 130); files renamed
+before that stay renamed and are recorded in the rename log.
 
 Preview a recursive selection:
 
@@ -175,6 +179,9 @@ folionym --dir ./input_files --interactive \
 folionym-undo --rename-log ./rename.log --dry-run
 ```
 
+`folionym-undo` prints a total of reverted, skipped and failed entries and
+exits with status 1 when any entry could not be reverted.
+
 Other entry points:
 
 ```bash
@@ -186,7 +193,8 @@ folionym --doctor
 ```
 
 `folionym-web` serves `http://127.0.0.1:8765/source` and opens your default
-browser. Use `folionym-web --port 9000 --no-open` to pick another loopback port
+browser. It prints a one-time link (`...?token=...`) to stderr; only that link
+starts a session. Use `folionym-web --port 9000 --no-open` to pick another loopback port
 without opening a browser. See the [browser guide](docs/frontend.md) and the
 [terminal guide](docs/tui.md) for their reviewed workflows, and run
 `folionym --help` for the complete CLI option list.
@@ -211,6 +219,8 @@ A few consequences worth knowing:
 
 - CLI dry run and apply are separate invocations and recompute proposals.
   `--plan-file` exports proposals; it is not consumed later as an apply plan.
+- `--plan-file`, `--export-metadata` and `--summary-json` describe one run, so
+  they are refused together with several `--dir` folders or `--watch`.
 - Browser plans and reports live only in the running server process. Completed
   runs expire after one hour or when more than 32 are retained; active
   operations pin their inputs. An expired plan needs a new Preview.
@@ -274,7 +284,9 @@ The default LLM preset uses `qwen2.5:3b`; the `gpu` preset selects
 `http://127.0.0.1:11434/v1/completions`. With the default chat API, requests go
 to the derived `/v1/chat/completions` endpoint; `--no-chat-api` uses the
 completions endpoint itself, and `--no-json-mode` stops requesting a JSON
-response format. Override the endpoint explicitly when needed:
+response format. An OpenAI-style base URL ending in `/v1` (for example
+`http://127.0.0.1:11434/v1`) is completed to `/v1/chat/completions` or
+`/v1/completions`. Override the endpoint explicitly when needed:
 
 ```bash
 FOLIONYM_LLM_URL=http://127.0.0.1:11434/v1/completions \

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections import Counter
+from collections.abc import Iterator
 from pathlib import Path
 
 from ...application.undo import UndoOutcome, UndoOutcomeKind, UndoSkipReason, undo_rename_log
@@ -34,20 +36,33 @@ def _report(outcome: UndoOutcome) -> None:
                 print(f"Skip ({reason}): {subject}", file=sys.stderr)
 
 
-def run_undo(log_path: Path, dry_run: bool) -> None:
-    """Read rename log and revert renames (LIFO). Caller must ensure log_path.exists()."""
+def run_undo(log_path: Path, dry_run: bool) -> int:
+    """Read rename log and revert renames (LIFO); return how many entries failed with an error."""
     if not log_path.is_file():
         print(
             f"Error: rename log path is not a file (e.g. directory): {escape_terminal_text(log_path)}",
             file=sys.stderr,
         )
-        return
-    reported = 0
-    for outcome in undo_rename_log(log_path, dry_run=dry_run):
-        _report(outcome)
-        reported += 1
-    if not reported:
+        return 1
+    counts = Counter(UndoOutcomeKind(outcome.kind) for outcome in _reported(undo_rename_log(log_path, dry_run=dry_run)))
+    if not counts:
         print("No entries in rename log.", file=sys.stderr)
+        return 0
+    done = counts[UndoOutcomeKind.WOULD_REVERT] if dry_run else counts[UndoOutcomeKind.REVERTED]
+    errors = counts[UndoOutcomeKind.ERROR]
+    print(
+        f"{'Would revert' if dry_run else 'Reverted'} {done}, skipped {counts[UndoOutcomeKind.SKIPPED]}, "
+        f"{errors} error{'' if errors == 1 else 's'}.",
+        file=sys.stderr,
+    )
+    return errors
+
+
+def _reported(outcomes: Iterator[UndoOutcome]) -> Iterator[UndoOutcome]:
+    """Print each outcome as it happens and pass it on for counting."""
+    for outcome in outcomes:
+        _report(outcome)
+        yield outcome
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -76,4 +91,5 @@ def main(argv: list[str] | None = None) -> None:
     if not log_path.is_file():
         print(f"Error: log path is not a file: {escape_terminal_text(log_path)}", file=sys.stderr)
         sys.exit(1)
-    run_undo(log_path, args.dry_run)
+    if run_undo(log_path, args.dry_run):
+        sys.exit(1)

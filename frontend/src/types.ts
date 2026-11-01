@@ -42,6 +42,7 @@ export interface DirectoryListing {
 export interface Bootstrap {
   settings: Settings;
   roots: DirectoryEntry[];
+  fallback_endpoint_external: boolean;
   capabilities: Record<string, boolean>;
 }
 

@@ -52,6 +52,7 @@ export const demoBootstrap: Bootstrap = {
   roots: [
     { name: "Documents", path: "/Users/demo/Documents", pdf_count: 8 },
   ],
+  fallback_endpoint_external: false,
   capabilities: {
     ocr: true,
     pdf_metadata: true,

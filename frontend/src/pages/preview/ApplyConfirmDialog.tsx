@@ -2,6 +2,7 @@ import { Button, Modal, compactPath } from "../../components";
 
 type ApplyConfirmDialogProps = {
   open: boolean;
+  busy: boolean;
   selectedCount: number;
   reviewCount: number;
   skippedFailedCount: number;
@@ -13,6 +14,7 @@ type ApplyConfirmDialogProps = {
 
 export function ApplyConfirmDialog({
   open,
+  busy,
   selectedCount,
   reviewCount,
   skippedFailedCount,
@@ -28,7 +30,7 @@ export function ApplyConfirmDialog({
       footer={
         <>
           <Button onClick={onClose}>Keep reviewing</Button>
-          <Button onClick={onConfirm} variant="primary">
+          <Button disabled={busy} onClick={onConfirm} variant="primary">
             Apply {selectedCount} {nameLabel}
           </Button>
         </>

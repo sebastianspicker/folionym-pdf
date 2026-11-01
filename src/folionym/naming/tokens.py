@@ -96,10 +96,12 @@ def normalize_keywords(raw: str | list[str] | tuple[str, ...] | None) -> list[st
     )
 
     filtered: list[str] = []
+    seen: set[str] = set()
     for token in tokens:
         t = token.strip()
-        if not t:
+        if not t or t.casefold() in seen:
             continue
+        seen.add(t.casefold())
         low = t.lower()
         if low in {
             "...",

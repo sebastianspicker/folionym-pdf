@@ -31,17 +31,19 @@ function useModalFocus(
   closeRef: RefObject<HTMLButtonElement | null>,
   modalRef: RefObject<HTMLElement | null>,
 ) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => handleModalKeyDown(event, modalRef.current, onClose);
+    const onKeyDown = (event: KeyboardEvent) => handleModalKeyDown(event, modalRef.current, () => onCloseRef.current());
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       previous?.focus();
     };
-  }, [open, onClose, closeRef, modalRef]);
+  }, [open, closeRef, modalRef]);
 }
 
 function closeFromBackdrop(event: MouseEvent<HTMLDivElement>, onClose: () => void) {

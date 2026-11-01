@@ -48,7 +48,6 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
   const apply = usePreviewApply({
     plan: preview.plan,
     selected: preview.selected,
-    setError: preview.setError,
   });
 
   useEffect(() => {
@@ -117,7 +116,7 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
     );
   }
 
-  const localOnly = isLocalEndpoint(bootstrap.settings);
+  const localOnly = isLocalEndpoint(bootstrap.settings, bootstrap.fallback_endpoint_external);
   const facts = processingFacts(bootstrap.settings);
   return (
     <AppChrome
@@ -135,6 +134,7 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
       overlays={
         <>
           <ApplyConfirmDialog
+            busy={apply.applying}
             localOnly={localOnly}
             onClose={apply.closeConfirm}
             onConfirm={() => {
@@ -186,7 +186,7 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
           onPageChange={preview.setPage}
           activeId={preview.activeId}
           allVisibleSelected={preview.allVisibleSelected}
-          error={preview.error}
+          error={apply.applyError}
           onActivate={preview.setActiveId}
           onOpen={narrow ? () => {
             setSheetOpen(true);
@@ -194,9 +194,7 @@ export function PreviewPage({ bootstrap }: { bootstrap: Bootstrap }) {
           onClear={() => {
             preview.setSelected(new Set());
           }}
-          onDismissError={() => {
-            preview.setError("");
-          }}
+          onDismissError={apply.clearApplyError}
           onQueryChange={preview.setQuery}
           onSelectVisible={preview.selectVisible}
           onToggle={preview.toggle}

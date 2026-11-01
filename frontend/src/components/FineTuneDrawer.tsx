@@ -195,7 +195,7 @@ export function FineTuneDrawer({
               setting="use_llm"
               settings={settings}
             />
-            {settings.use_llm && (
+            {(settings.use_llm || settings.vision_first || settings.use_vision_fallback) && (
               <>
                 <TextSetting
                   label="Model endpoint"

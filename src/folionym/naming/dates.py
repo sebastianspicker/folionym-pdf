@@ -11,6 +11,9 @@ _DATE_RE_YMD = re.compile(
 )
 _DATE_RE_YMD_COMPACT = re.compile(r"\b(\d{4})(\d{2})(\d{2})(?:T\d{6}(?:Z|[+-]\d{2}:?\d{2})?)?\b")
 _DATE_RE_DMY = re.compile(r"\b(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b")
+# dd.mm.yy / mm/dd/yy with two-digit day and month, so version and section numbers such as
+# 1.2.15 do not count; the guards keep it out of longer numbers and four-digit years.
+_DATE_RE_DMY_SHORT = re.compile(r"(?<!\d)(?<!\d\.)(\d{2})[./](\d{2})[./](\d{2})(?!\d|\.\d)")
 
 _DE_MONTHS = (
     "januar|jan\\.?|februar|feb\\.?|märz|mär\\.?|mrz\\.?|maerz|april|apr\\.?|mai|"
@@ -291,7 +294,8 @@ def _append_prefixed_dmy_candidates(
 
 def _append_ymd_candidates(candidates: list[_DateCandidate], context: _CandidateContext) -> None:
     """Collect year-month-day dates in separated and compact forms."""
-    for regex, score in ((_DATE_RE_YMD, 120), (_DATE_RE_YMD_COMPACT, 115)):
+    # A bare 8-digit run is often a customer or invoice number, so it ranks below separated dates.
+    for regex, score in ((_DATE_RE_YMD, 120), (_DATE_RE_YMD_COMPACT, 90)):
         for match in regex.finditer(context.content):
             year, month, day = match.groups()
             _append_date_candidate(
@@ -323,6 +327,33 @@ def _append_dmy_candidates(
                 context=context,
                 start=match.start(),
                 base_score=100,
+            ),
+        )
+
+
+def _append_short_year_candidates(
+    candidates: list[_DateCandidate],
+    context: _CandidateContext,
+    *,
+    date_locale: str,
+) -> None:
+    """Collect two-digit-year numeric dates, reading yy as 20yy unless that is in the future."""
+    for match in _DATE_RE_DMY_SHORT.finditer(context.content):
+        g1, g2, short_year = match.groups()
+        year = 2000 + int(short_year)
+        if year > context.today.year + 1:
+            year -= 100
+        _append_ordered_date_candidate(
+            candidates,
+            _OrderedDateParts(
+                first=g1,
+                second=g2,
+                year=str(year),
+                month_first=date_locale == "mdy",
+                month_is_name=False,
+                context=context,
+                start=match.start(),
+                base_score=95,  # below dd.mm.yyyy, above a bare 8-digit run
             ),
         )
 
@@ -378,6 +409,7 @@ def _find_date_candidates(
     _append_prefixed_dmy_candidates(candidates, context, date_locale=date_locale)
     _append_ymd_candidates(candidates, context)
     _append_dmy_candidates(candidates, context, date_locale=date_locale)
+    _append_short_year_candidates(candidates, context, date_locale=date_locale)
     _append_long_month_candidates(candidates, context)
     _append_month_year_candidates(candidates, context)
     return candidates

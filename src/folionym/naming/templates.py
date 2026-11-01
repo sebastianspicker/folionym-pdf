@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, replace
 
 from ..infrastructure.filenames import sanitize_filename_base
@@ -131,12 +132,19 @@ def _template_replacements(template_input: _FilenameTemplateInput, config: Renam
 
 def _format_filename_template(template_input: _FilenameTemplateInput, config: RenamerConfig) -> str | None:
     """Format filename template using the configured naming template."""
-    repl = _template_replacements(template_input, config)
+    # Empty fields become a marker so exactly one separator next to each is dropped below,
+    # instead of leaving "20240115--invoice-"; separators the template itself repeats stay.
+    repl = {key: value or _EMPTY_FIELD for key, value in _template_replacements(template_input, config).items()}
     try:
-        return str(config.output.template.filename_template).format(**repl).strip()
-    except (KeyError, AttributeError, TypeError) as e:
+        formatted = str(config.output.template.filename_template).format(**repl)
+    except (KeyError, AttributeError, TypeError, ValueError, IndexError) as e:
         logger.warning("Template failed (%s); using default filename", e)
         return None
+    return _EMPTY_FIELD_WITH_SEPARATOR_RE.sub("", formatted).replace(_EMPTY_FIELD, "").strip()
+
+
+_EMPTY_FIELD = "\x00"
+_EMPTY_FIELD_WITH_SEPARATOR_RE = re.compile(r"[-_]\x00|\x00[-_]?")
 
 
 def _truncate_filename_to_max_chars(filename: str, config: RenamerConfig) -> str:

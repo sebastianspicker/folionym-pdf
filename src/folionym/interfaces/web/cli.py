@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import secrets
 import socket
+import sys
 import threading
 import time
 import webbrowser
@@ -41,7 +43,9 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit("Packaged browser assets are missing. Reinstall Folionym with the web extra.")
 
     host = "127.0.0.1"
-    url = f"http://{host}:{args.port}/source"
+    token = secrets.token_urlsafe(32)
+    url = f"http://{host}:{args.port}/source?token={token}"
+    print(f"Folionym is running at {url}", file=sys.stderr, flush=True)
     if not args.no_open:
         threading.Thread(
             target=_open_browser_when_ready,
@@ -49,7 +53,7 @@ def main(argv: list[str] | None = None) -> None:
             name="folionym-browser-open",
             daemon=True,
         ).start()
-    uvicorn.run(create_app(static_dir=static_dir), host=host, port=args.port, log_level="warning")
+    uvicorn.run(create_app(static_dir=static_dir, launch_token=token), host=host, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":

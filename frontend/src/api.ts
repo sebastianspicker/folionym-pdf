@@ -59,9 +59,23 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+// One exchange per page load: the launch token works only once, and React's StrictMode runs
+// the bootstrap effect twice in development.
+let session: Promise<void> | null = null;
+
+async function openSession(): Promise<void> {
+  const token = new URLSearchParams(window.location.search).get("token");
+  await request<{ ready: boolean }>(`/api/v1/session${token ? `?token=${encodeURIComponent(token)}` : ""}`);
+  if (token) window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+}
+
 const localApi = {
   bootstrap: async () => {
-    await request<{ ready: boolean }>("/api/v1/session");
+    session ??= openSession().catch((error: unknown) => {
+      session = null;
+      throw error;
+    });
+    await session;
     return request<Bootstrap>("/api/v1/bootstrap");
   },
   filesystem: (path: string) =>

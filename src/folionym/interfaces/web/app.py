@@ -8,7 +8,7 @@ import os
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
-from threading import Event
+from threading import Event, Lock
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
@@ -16,8 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 from fastapi.staticfiles import StaticFiles
 
 from ...application.discovery import count_directory_pdfs, list_child_directories, local_filesystem_roots
-from ...application.models import PreviewPlan
-from ...application.privacy import external_llm_endpoint
+from ...application.privacy import external_llm_endpoint, fallback_endpoint_is_external
 from ..ui_settings import build_config_from_ui_settings, load_ui_settings, merged_ui_settings
 from .payloads import item_payload, plan_payload, report_payload
 from .runtime import RunConflictError, RunEvent, RunRegistry
@@ -140,11 +139,17 @@ def _requires_json_body(request: Request) -> bool:
     return is_mutating and not request.headers.get("content-type", "").startswith("application/json")
 
 
+def _has_session_cookie(request: Request, session_token: str) -> bool:
+    """Return whether the request carries the session cookie."""
+    cookie = request.cookies.get(_SESSION_COOKIE)
+    return cookie is not None and secrets.compare_digest(cookie.encode(), session_token.encode())
+
+
 def _api_request_security_error(request: Request, session_token: str) -> JSONResponse | None:
     """Return the first failed API-boundary response, or ``None`` when validation passes."""
     if not _requires_api_session(request):
         return None
-    if request.cookies.get(_SESSION_COOKIE) != session_token:
+    if not _has_session_cookie(request, session_token):
         return JSONResponse({"detail": "Local session required."}, status_code=403)
     origin = request.headers.get("origin")
     host = request.headers.get("host", "")
@@ -239,23 +244,6 @@ def _prepare_preview_settings(request: PreviewRequest, acknowledged: set[str]) -
     return settings
 
 
-def _artifact_path(plan: PreviewPlan, kind: str) -> Path:
-    """Resolve a configured machine-readable artifact for download."""
-    paths = plan.config.output.paths
-    configured: dict[str, str | Path | None] = {
-        "rename-log": paths.rename_log_path,
-        "metadata": paths.export_metadata_path,
-        "summary": paths.summary_json_path,
-    }
-    value = configured.get(kind)
-    if not value:
-        raise HTTPException(404, "Artifact is not configured.")
-    path = Path(value).expanduser()
-    if not path.is_file():
-        raise HTTPException(404, "Artifact is not available.")
-    return path
-
-
 def _install_security_middleware(app: FastAPI, session_token: str) -> None:
     """Install the loopback host, same-origin, session, and response-header boundary."""
 
@@ -285,12 +273,30 @@ def _register_source_routes(app: FastAPI, registry: RunRegistry) -> None:
     request_acknowledgements: set[str] = app.state.external_endpoint_acknowledgements
 
     @app.get("/api/v1/session")
-    def session(request: Request) -> Response:
-        """Create the same-origin browser session cookie."""
+    def session(request: Request, token: str = "") -> Response:
+        """Exchange the single-use launch token for the session cookie."""
+        state = request.app.state
+        if _has_session_cookie(request, state.session_token):
+            return JSONResponse({"ready": True})
+        with state.launch_lock:
+            launch_token: str | None = state.launch_token
+            accepted = bool(token) and launch_token is not None
+            accepted = accepted and secrets.compare_digest(token.encode(), str(launch_token).encode())
+            if accepted:
+                # Single use: a link copied from the process list or history opens no second session.
+                state.launch_token = None
+        if not accepted:
+            return JSONResponse(
+                {
+                    "detail": "This link is not valid or was already used. "
+                    "Restart folionym-web and open the link it prints."
+                },
+                status_code=403,
+            )
         response = JSONResponse({"ready": True})
         response.set_cookie(
             _SESSION_COOKIE,
-            request.app.state.session_token,
+            state.session_token,
             httponly=True,
             samesite="strict",
             secure=False,
@@ -305,6 +311,7 @@ def _register_source_routes(app: FastAPI, registry: RunRegistry) -> None:
         return {
             "settings": settings.model_dump(),
             "roots": [root.model_dump() for root in _roots()],
+            "fallback_endpoint_external": fallback_endpoint_is_external(),
             "capabilities": {"thumbnails": True, "ocr": True, "external_model_confirmation": True},
         }
 
@@ -393,7 +400,7 @@ def _register_plan_routes(app: FastAPI, registry: RunRegistry) -> None:
 
 
 def _register_media_routes(app: FastAPI, registry: RunRegistry) -> None:
-    """Register plan-owned thumbnails and configured artifacts."""
+    """Register plan-owned item evidence and thumbnails."""
     thumbnails = ThumbnailCache()
 
     @app.get("/api/v1/plans/{plan_id}/items/{item_id}")
@@ -423,18 +430,8 @@ def _register_media_routes(app: FastAPI, registry: RunRegistry) -> None:
             headers={"Cache-Control": "no-store"},
         )
 
-    @app.get("/api/v1/plans/{plan_id}/artifacts/{kind}")
-    def artifact(plan_id: str, kind: str) -> FileResponse:
-        """Download one configured output artifact for the retained plan."""
-        try:
-            plan = registry.get_plan(plan_id)
-        except KeyError as exc:
-            raise HTTPException(404, "Preview plan not found.") from exc
-        path = _artifact_path(plan, kind)
-        return FileResponse(path, filename=path.name)
 
-
-def _register_static_routes(app: FastAPI, static_dir: Path, session_token: str) -> None:
+def _register_static_routes(app: FastAPI, static_dir: Path) -> None:
     """Serve packaged Vite assets and the history-fallback application shell."""
     assets = static_dir / "assets"
     if assets.is_dir():
@@ -451,14 +448,6 @@ def _register_static_routes(app: FastAPI, static_dir: Path, session_token: str) 
                 "<!doctype html><title>Folionym</title><p>Frontend assets are not built.</p>",
                 status_code=503,
             )
-        response.set_cookie(
-            _SESSION_COOKIE,
-            session_token,
-            httponly=True,
-            samesite="strict",
-            secure=False,
-            path="/",
-        )
         return response
 
 
@@ -467,14 +456,21 @@ def create_app(
     registry: RunRegistry | None = None,
     static_dir: Path | None = None,
     session_token: str | None = None,
+    launch_token: str | None = None,
 ) -> FastAPI:
-    """Create the loopback browser application with isolated mutable state."""
+    """Create the loopback browser application with isolated mutable state.
+
+    ``launch_token`` is the one-time secret in the printed link; it is exchanged once for the
+    separate ``session_token`` cookie. Without it, no browser session can be started.
+    """
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     active_registry = registry or RunRegistry()
     active_token = session_token or secrets.token_urlsafe(32)
     active_static_dir = static_dir or default_static_dir()
     app.state.registry = active_registry
     app.state.session_token = active_token
+    app.state.launch_token = launch_token
+    app.state.launch_lock = Lock()
     app.state.static_dir = active_static_dir
     app.state.external_endpoint_acknowledgements = set()
     _install_security_middleware(app, active_token)
@@ -482,5 +478,5 @@ def create_app(
     _register_run_routes(app, active_registry)
     _register_plan_routes(app, active_registry)
     _register_media_routes(app, active_registry)
-    _register_static_routes(app, active_static_dir, active_token)
+    _register_static_routes(app, active_static_dir)
     return app

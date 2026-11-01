@@ -7,9 +7,14 @@ python -m pip install -e '.[web,pdf]'
 folionym-web
 ```
 
-It serves the packaged React application at `http://127.0.0.1:8765/source`. Use
-`folionym-web --port 9000 --no-open` to choose another loopback port. There is no
-supported remote, multi-user, container, or hosted deployment.
+It serves the packaged React application at `http://127.0.0.1:8765/source` and
+prints `Folionym is running at http://127.0.0.1:8765/source?token=...` to stderr.
+Only that link starts a browser session, and it works once; the page removes the
+token from the address bar once the session is established. To use another
+browser, restart `folionym-web` and open the new link. Use
+`folionym-web --port 9000 --no-open` to choose another loopback port and open
+the printed link yourself. There is no supported remote, multi-user, container,
+or hosted deployment.
 
 ## Screenshot tour
 
@@ -136,7 +141,10 @@ Start the loopback backend in one terminal:
 folionym-web --no-open
 ```
 
-Then, from a second terminal, work in `frontend/`:
+Copy the token from the printed link and do not open the link itself, because
+the token works once. Then, from a second terminal, work in `frontend/`, and
+open the Vite server with that token, for example
+`http://127.0.0.1:5173/source?token=<printed token>`:
 
 ```bash
 npm run typecheck

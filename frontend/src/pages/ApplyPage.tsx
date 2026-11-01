@@ -72,7 +72,7 @@ export function ApplyPage({ bootstrap }: { bootstrap: Bootstrap }) {
     );
   }
 
-  const localOnly = isLocalEndpoint(bootstrap.settings);
+  const localOnly = isLocalEndpoint(bootstrap.settings, bootstrap.fallback_endpoint_external);
   const summary = headline(report.counts);
 
   return (
