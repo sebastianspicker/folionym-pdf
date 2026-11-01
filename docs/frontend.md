@@ -104,8 +104,8 @@ This writes `dist-demo/` with the project base `/folionym-pdf/`, a `404.html`
 fallback for route refreshes, the `tour.html` landing page built from
 `frontend/tour.html`, and a copy of `docs/screenshots/`. It never writes
 `src/folionym/web_dist/`. The *Pages demo* workflow validates this
-build on pull requests and is configured to deploy it from `main` or a manually
-dispatched run. The repository's Pages source must be set to **GitHub Actions**
+build only when manually dispatched on `main`, then deploys the static demo.
+Pull requests and ordinary pushes do not build or deploy Pages. The repository's Pages source must be set to **GitHub Actions**
 before its first deployment. Inspecting the repository alone does not prove that
 Pages is enabled or that the URL is currently live.
 

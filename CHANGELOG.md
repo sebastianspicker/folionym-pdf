@@ -28,6 +28,11 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Changed
 
+- General CI runs automatically only for Dependabot-authored pull requests;
+  ordinary builds remain available manually. Security scans retain their own
+  triggers. Pages deployment requires a manual run on `main`.
+- Enable weekly native uv, npm frontend and GitHub Actions dependency updates.
+
 - The default document language is now English (`en`), including the OCR
   language (`eng`). German stays fully supported with `--language de` or
   `language: de` in a config file. The browser and terminal app also default
@@ -117,6 +122,12 @@ candidate commit is tagged and published as a GitHub prerelease.
   `PLR0915`) and aligned mypy with Python 3.14.
 
 ### Fixed
+
+- Check Preview paths against resolved filesystem roots, including directory
+  aliases, while retaining downstream source-symlink rejection.
+
+- Refresh the locked security fixes for certifi 2026.10.18, Pillow 13.0.0,
+  fpdf2 2.8.8, and the frontend development server Vite 8.1.6.
 
 - The README quick start and `folionym --help` now state the default document
   language and that it also selects the OCR language.

@@ -236,12 +236,13 @@ Treat these outputs as document-adjacent private data.
 of the Python distribution. A normal Vite build writes generated assets to
 `src/folionym/web_dist/`; the wheel must contain those assets and the bundled data
 files. `make release-check` validates the lock, frontend build, repository
-hygiene, architecture, Python formatting and linting, types, tests, source and
-wheel distributions, and installed console entries.
+hygiene, architecture, Python formatting and linting, types, source and wheel
+distributions, and installed console entries. Local regression suites run
+separately; they are not included in this Make target.
 
 The static demo uses a separate Vite mode and writes ignored `dist-demo/`.
-Deployment, when enabled, is handled by the Pages workflow and does not deploy
-the Python application.
+Deployment, when enabled, requires a manual Pages workflow run on `main` and
+does not deploy the Python application.
 
 ## Invariants and extension points
 

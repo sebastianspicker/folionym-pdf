@@ -60,11 +60,13 @@ def _host_name(host_header: str) -> str:
 def _confined_path(path_value: str) -> Path:
     """Normalize a client-supplied path and require it to sit under a local filesystem root."""
     normalized = os.path.normpath(os.path.expanduser(path_value))
+    if not os.path.isabs(normalized):
+        raise HTTPException(403, "Path is outside the local filesystem roots.")
+    resolved = os.path.realpath(normalized)
     for root in local_filesystem_roots():
-        root_text = os.path.normpath(str(root))
-        if normalized == root_text:
-            return Path(root_text)
-        if normalized.startswith(root_text.rstrip(os.sep) + os.sep):
+        root_text = os.path.realpath(str(root))
+        if resolved == root_text or resolved.startswith(root_text.rstrip(os.sep) + os.sep):
+            # Keep the original path so downstream source-link checks still apply.
             return Path(normalized)
     raise HTTPException(403, "Path is outside the local filesystem roots.")
 

@@ -1,6 +1,6 @@
 # Folionym
 
-**Rename PDFs from what's actually inside them — locally, with a review step before anything moves.**
+**Give PDFs useful names from their contents, with local rules and optional model assistance.**
 
 [![CI](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/ci.yml)
 [![Security](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/security.yml/badge.svg)](https://github.com/sebastianspicker/folionym-pdf/actions/workflows/security.yml)
@@ -8,16 +8,29 @@
 [![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-3776AB)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-0e6b57)](LICENSE)
 
-Folionym reads the text and metadata of a PDF, works out a useful filename with
-deterministic rules and optional local-LLM help, and shows you the result before
-touching the filesystem. You can drive it from the command line, a terminal UI,
-or a browser UI that only listens on your own machine.
+Folionym reads PDF text and metadata and proposes useful filenames with
+deterministic rules and optional model assistance. Use it from the command
+line, a terminal interface, or a browser interface that listens only on your
+own machine. Browser and directory-terminal workflows let you review a plan
+before applying it; command-line previews use `--dry-run`.
+
+<details>
+<summary>Status and limitations</summary>
+
+**Project status:** Folionym is an independent experimental project for proposing and
+reviewing PDF filenames from document content. Developed independently alongside my main
+professional work. The work-in-progress alpha (`0.4.0a1`) is intended for evaluation and adaptation, not
+as a finished document-management product.
+
+**Disclaimer.** Review proposed names and test on copies before changing important
+files. Keep backups and check rename results. If you enable a model endpoint or post-rename
+hook, decide whether it may receive document-derived content; a local interface does not
+make a configured external destination private.
+
+</details>
 
 **Try it without installing:** [open the interactive demo](https://sebastianspicker.github.io/folionym-pdf/)
 — it runs entirely in your browser on simulated files.
-
-> **Status:** alpha (`0.4.0a1`). Keep backups of important documents and review
-> proposed names before applying them.
 
 ![Folionym Preview screen with a rename ledger](docs/screenshots/02-preview.png)
 
@@ -39,6 +52,17 @@ keywords, summary, version, invoice ID, amount, and company fields.
 - Directory, recursive, single-file, watch, dry-run, and interactive workflows
 - Exact reviewed plans in the browser and directory TUI
 - Backups, rename logs, constrained undo, plan export, metadata export, and run summaries
+
+Use Preview or `--dry-run` to inspect names before applying changes. A CLI
+apply run recomputes its proposals; it does not consume an earlier dry run.
+
+```mermaid
+flowchart LR
+    A[Selected PDFs] --> B[Extract text and metadata]
+    B --> C[Propose filenames]
+    C --> D[Preview or apply]
+    D --> E[Guarded rename and report]
+```
 
 Everything runs as one local process under your own user account. The LLM
 endpoint and the optional post-rename hook are the only places document-derived
@@ -346,6 +370,11 @@ make release-check
 builds the frontend into `src/folionym/web_dist/`. `make release-check` adds
 lock validation, repository hygiene, packaging, and an isolated installed-wheel
 check to all other gates.
+
+General CI runs automatically for Dependabot-authored pull requests and is
+also available through manual dispatch. Security scans have their own triggers.
+The static Pages demo is built and deployed only by a manual run on `main`;
+no workflow deploys the Python application.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the change workflow,
 [DESIGN.md](DESIGN.md) for architecture, and [RELEASING.md](RELEASING.md) for the

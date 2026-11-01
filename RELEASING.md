@@ -63,7 +63,10 @@ will be tagged.
 ## 3. Review and merge
 
 1. Commit the complete candidate and open a focused pull request.
-2. Wait for CI and Security checks on the exact pull-request commit.
+2. Run the CI workflow manually on the candidate branch and confirm its head
+   SHA matches the pull-request commit. General CI runs automatically only for
+   Dependabot-authored PRs. Wait for that CI run and the Security checks before
+   merging; a skipped automatic CI job is not a passing release gate.
 3. Merge according to branch protection. Do not tag from the pre-merge working
    tree or reuse its `dist/` directory.
 
@@ -114,8 +117,15 @@ git tag -a v0.4.0a1 "$RELEASE_COMMIT" -m "Folionym 0.4.0a1"
 git push origin v0.4.0a1
 ```
 
-Wait for the tag-triggered CI and Security workflows to pass. If they fail, fix
-forward with a new prerelease version; do not move a published tag.
+Security runs on the tag automatically. Dispatch general CI explicitly for the
+same tag, then confirm both workflows checked the recorded release commit:
+
+```bash
+gh workflow run ci.yml --ref v0.4.0a1
+```
+
+Wait for the manual CI and tag-triggered Security workflows to pass. If either
+fails, fix forward with a new prerelease version; do not move a published tag.
 
 ## 7. Publish the GitHub prerelease
 
