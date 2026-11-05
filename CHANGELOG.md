@@ -28,6 +28,9 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Changed
 
+- `DESIGN.md` explains how each command runs, how one PDF becomes a proposed
+  name, the browser's HTTP and event flow, plan item states, and the build and
+  release pipeline, each linked to the code that implements it.
 - `--plan-file`, `--export-metadata` and `--summary-json` are refused together
   with several `--dir` folders or `--watch`. Each folder, and each watched
   file, is a separate run that rewrote these files, so they used to keep only

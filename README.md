@@ -14,6 +14,8 @@ line, a terminal interface, or a browser interface that listens only on your
 own machine. Browser and directory-terminal workflows let you review a plan
 before applying it; command-line previews use `--dry-run`.
 
+> _Claude was used to polish and proof-read the code and documentation of this repository._
+
 <details>
 <summary>Status and limitations</summary>
 
@@ -389,7 +391,9 @@ The static Pages demo is built and deployed only by a manual run on `main`;
 no workflow deploys the Python application.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the change workflow,
-[DESIGN.md](DESIGN.md) for architecture, and [RELEASING.md](RELEASING.md) for the
+[DESIGN.md](DESIGN.md) for architecture (new contributors: start with
+[How it runs](DESIGN.md#how-it-runs) and
+[How one PDF becomes a proposed name](DESIGN.md#how-one-pdf-becomes-a-proposed-name)), and [RELEASING.md](RELEASING.md) for the
 manual prerelease procedure.
 
 ## Troubleshooting

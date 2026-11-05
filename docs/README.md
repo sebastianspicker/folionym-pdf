@@ -14,8 +14,9 @@ examples, and operational limits. The pages below go deeper.
 
 ## Understanding the design
 
-- [Architecture](../DESIGN.md): system context, components, dependency
-  direction, runtime flows, state, and invariants.
+- [Architecture](../DESIGN.md): system context, how each process runs,
+  components, dependency direction, the naming pipeline, the browser HTTP flow,
+  plan item states, state, build and release, and invariants.
 - [Product scope](../PRODUCT.md): supported workflows and interface
   requirements.
 - [Decision 0001](decisions/0001-rename-filesystem-boundary.md): the filesystem

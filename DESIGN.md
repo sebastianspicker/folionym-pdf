@@ -47,6 +47,28 @@ The optional static Pages build is a deterministic simulation. It has no backend
 does not read PDFs, and cannot rename files. Its source is shared with the browser
 client, but its runtime sits outside the local application topology.
 
+## How it runs
+
+Each console entry point is its own short- or long-lived process. None of them
+talks to another; they share only files on disk. Start reading the code at the
+entry file of the interface you care about.
+
+| Command | Process | Concurrency | Entry file |
+| --- | --- | --- | --- |
+| `folionym` | one run per invocation, then exits (or loops with `--watch`) | optional worker pool for proposals (`--workers`) | [interfaces/cli/command.py](src/folionym/interfaces/cli/command.py) |
+| `folionym-undo` | one run per invocation | none | [interfaces/cli/undo.py](src/folionym/interfaces/cli/undo.py) |
+| `folionym-tui` | Textual app in the terminal | Textual workers for Preview and Apply | [interfaces/tui/app.py](src/folionym/interfaces/tui/app.py) |
+| `folionym-web` | Uvicorn on `127.0.0.1:8765` serving the API and the built React app | one background thread per run, one active run at a time | [interfaces/web/cli.py](src/folionym/interfaces/web/cli.py) |
+
+`folionym-web` prints a URL with a single-use launch token and opens the
+browser. The React app exchanges that token for an HTTP-only session cookie
+(`GET /api/v1/session`), then talks only to `/api/v1/*` on the same origin. In
+development, `npm run dev` serves the frontend from Vite on `127.0.0.1:5173`
+and proxies `/api` to a running `folionym-web` on port 8765.
+
+All four processes run the same in-process pipeline described below; there is no
+job queue, database, or separate worker service.
+
 ## Components
 
 | Component | Responsibility |
@@ -155,6 +177,56 @@ A new cross-package import needs an edit to `ALLOWED_DEPENDENCIES`; see
 
 ## Principal flows
 
+### How one PDF becomes a proposed name
+
+Every interface reaches the same per-file pipeline; it computes a name and never
+touches the filesystem.
+
+```mermaid
+flowchart LR
+    pdf[/PDF file/]
+    extract[extract_pdf_content]
+    propose[process_content_to_proposal]
+    date[date from content<br/>or PDF metadata]
+    meta[resolve_filename_metadata]
+    llm[(OpenAI-compatible<br/>endpoint)]
+    compose[final_generated_filename]
+    proposal[Proposal]
+
+    pdf -->|path| extract
+    extract -->|"text (text, OCR or vision)"| propose
+    propose --> date
+    propose --> meta
+    meta -.->|"optional JSON completion"| llm
+    date -->|YYYYMMDD| compose
+    meta -->|"category, keywords, summary"| compose
+    compose -->|"sanitized base name"| proposal
+
+    classDef focus fill:#fde68a,stroke:#b45309,color:#1f2937
+    class meta focus
+```
+
+`application.proposals.produce_proposals` opens one LLM client for the whole
+batch and calls `process_one_file` per PDF, in parallel when `workers > 1`.
+Extraction tries `vision_first` if configured, then text or OCR, then a vision
+fallback when the text is too short. `naming.metadata.resolve_filename_metadata`
+is the decision point: it combines rule overrides, the bundled heuristic scores,
+and optional model answers into a category, up to three keywords, and summary
+tokens. Model responses are cached under a SHA-256 of the PDF file when the
+response cache is on, and `--no-llm` leaves only heuristics. The template step applies
+`--template` or the default `date-category-keywords-summary` layout, and the
+application layer sanitizes the result into a `Proposal`. An error becomes
+part of the proposal instead of aborting the batch.
+
+Where in the code:
+
+- [application/proposals.py](src/folionym/application/proposals.py): `produce_proposals`, `process_one_file`, `process_content_to_proposal`
+- [extraction/pipeline.py](src/folionym/extraction/pipeline.py): `extract_pdf_content` and the strategy order
+- [naming/service.py](src/folionym/naming/service.py): `generate_filename`
+- [naming/metadata.py](src/folionym/naming/metadata.py), [naming/heuristics.py](src/folionym/naming/heuristics.py), [naming/analysis.py](src/folionym/naming/analysis.py): category, keywords, summary
+- [naming/templates.py](src/folionym/naming/templates.py): `final_generated_filename`
+- [llm/completion.py](src/folionym/llm/completion.py), [llm/cache.py](src/folionym/llm/cache.py): JSON completion with retry and the response cache
+
 ### Conventional CLI and immediate single-file flow
 
 ```mermaid
@@ -206,6 +278,89 @@ TUI source or settings edit invalidates the retained plan, and an incomplete or
 cancelled Preview cannot be applied. TUI single-file rename deliberately uses the
 conventional unique-available policy instead.
 
+### The browser flow over HTTP
+
+What a click in the browser reaches, from the React app down to the rename.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant ui as React app
+    participant api as FastAPI app.py
+    participant reg as RunRegistry
+    participant plan as reviewed_plan
+    participant ops as rename_ops
+
+    U->>ui: Choose folder, click Preview
+    ui->>api: POST /api/v1/previews
+    api->>reg: start_preview(path, settings)
+    reg--)plan: thread: create_preview_plan
+    api-->>ui: 202 run_id
+    ui->>api: GET /api/v1/runs/{id}/events
+    reg-->>ui: SSE progress, then completed
+    ui->>api: GET /api/v1/plans/{plan_id}
+    api-->>ui: items with status and target
+    U->>ui: Select items, click Apply
+    ui->>api: POST /api/v1/plans/{plan_id}/apply
+    api->>reg: start_apply(plan_id, revision, ids)
+    reg--)plan: thread: apply_reviewed_plan
+    plan->>ops: apply_single_rename(exact_target)
+    reg-->>ui: SSE completed with report_id
+    ui->>api: GET /api/v1/reports/{report_id}
+```
+
+Steps 2 and 11 return `202` immediately; the work runs on a daemon thread that
+`RunRegistry` starts (steps 4 and 13), and only one Preview or Apply may run at a
+time, so a second start gets `409`. Progress arrives as server-sent events
+(steps 6–7 and 15); `useRun` also polls `GET /api/v1/runs/{id}`, slowly while
+the stream is open and quickly once it drops. The plan from step 8 stays in server memory;
+Apply sends back its `revision` and the selected item IDs, never the target
+names, so the browser cannot ask for a name the plan did not propose. Step 14
+passes the source fingerprint captured at Preview, and `rename_ops` refuses if
+the file changed or the target is taken.
+
+Where in the code:
+
+- [frontend/src/api.ts](frontend/src/api.ts): request helpers and the session handshake
+- [frontend/src/hooks/useRun.ts](frontend/src/hooks/useRun.ts): `EventSource` subscription and polling fallback
+- [interfaces/web/app.py](src/folionym/interfaces/web/app.py): routes, loopback and cookie checks, static files
+- [interfaces/web/runtime.py](src/folionym/interfaces/web/runtime.py): `RunRegistry`, worker threads, events, retention
+- [application/reviewed_plan.py](src/folionym/application/reviewed_plan.py): `create_preview_plan`, `apply_reviewed_plan`
+- [rename_ops/execution.py](src/folionym/rename_ops/execution.py), [rename_ops/filesystem.py](src/folionym/rename_ops/filesystem.py): the no-overwrite rename
+
+### Plan item states
+
+What can happen to one file between Preview and Apply.
+
+```mermaid
+stateDiagram-v2
+    [*] --> READY: name proposed
+    [*] --> REVIEW: model failed or generic category
+    [*] --> SKIPPED: no text or no proposal
+    [*] --> FAILED: extraction or naming error
+    READY --> RENAMED: applied
+    REVIEW --> RENAMED: selected and applied
+    READY --> UNCHANGED: name already matches
+    READY --> ApplyFailed: source changed or target taken
+    REVIEW --> ApplyFailed: source changed or target taken
+    READY --> CANCELLED: run cancelled
+    SKIPPED --> [*]
+    FAILED --> [*]
+    RENAMED --> [*]
+```
+
+Preview assigns a `PreviewStatus` (upper row) without inventing confidence: a
+proposal is `REVIEW` when the model call failed or the category is empty or
+generic. The browser preselects `READY` items; `REVIEW` items can be selected
+too. Apply turns each selected item into an `ApplyStatus`; `ApplyFailed` stands
+for the `FAILED` outcome, which also covers duplicate selected targets. `REVIEW`
+items can reach `UNCHANGED` and `CANCELLED` the same way as `READY` ones; those
+edges are left out to keep the chart readable. Both enums live in
+[application/models.py](src/folionym/application/models.py); the classification
+is `_result_status` and the preflight is `_preflight_selected_item` in
+[application/reviewed_plan.py](src/folionym/application/reviewed_plan.py).
+
 ## State and outputs
 
 `RenamerConfig` is the canonical runtime configuration. CLI configuration is
@@ -243,6 +398,37 @@ separately; they are not included in this Make target.
 The static demo uses a separate Vite mode and writes ignored `dist-demo/`.
 Deployment, when enabled, requires a manual Pages workflow run on `main` and
 does not deploy the Python application.
+
+How a commit turns into something people install or open:
+
+```mermaid
+flowchart LR
+    src[frontend/src]
+    vite[npm run build]
+    webdist[src/folionym/web_dist]
+    ci["make ci<br/>(ci.yml)"]
+    wheel[wheel and sdist]
+    release[GitHub prerelease]
+    demo["npm run build:demo<br/>(pages.yml)"]
+    pages[GitHub Pages demo]
+
+    src --> vite -->|"committed assets"| webdist
+    webdist --> ci -->|"uv build"| wheel
+    wheel -.->|"manual gh release"| release
+    src -.->|"manual dispatch on main"| demo --> pages
+```
+
+The built frontend is committed, so `make ci` (`release-check` plus
+`web-dist-check`) fails when `web_dist/` is stale. CI runs on manual dispatch and
+on Dependabot pull requests; [security.yml](.github/workflows/security.yml)
+runs CodeQL, dependency review, pip-audit, and TruffleHog on its own triggers.
+Publishing is a maintainer step in [RELEASING.md](RELEASING.md); no workflow
+uploads to a package index.
+
+Where in the code: [Makefile](Makefile),
+[.github/workflows/ci.yml](.github/workflows/ci.yml),
+[.github/workflows/pages.yml](.github/workflows/pages.yml),
+[frontend/vite.config.ts](frontend/vite.config.ts).
 
 ## Invariants and extension points
 
