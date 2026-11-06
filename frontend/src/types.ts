@@ -1,6 +1,6 @@
 export type RunState = "queued" | "running" | "completed" | "cancelled" | "failed";
 export type PreviewStatus = "ready" | "review" | "skipped" | "failed";
-export type ApplyStatus = "renamed" | "skipped" | "unchanged" | "failed" | "cancelled";
+export type ApplyStatus = "renamed" | "unchanged" | "failed" | "cancelled";
 export type Language = "de" | "en";
 export type NamingCase = "camelCase" | "kebabCase" | "snakeCase";
 export type DateFormat = "dmy" | "mdy";
@@ -11,7 +11,7 @@ export type SettingsTextKey =
   | "template" | "backup_dir" | "rename_log" | "export_metadata"
   | "summary_json" | "rules_file" | "post_rename_hook" | "llm_url"
   | "llm_model" | "llm_timeout" | "max_tokens" | "max_content_chars"
-  | "max_content_tokens" | "workers" | "max_filename_chars" | "acknowledged_external_endpoint";
+  | "max_content_tokens" | "workers" | "max_filename_chars";
 
 export type SettingsBooleanKey =
   | "dry_run" | "use_llm" | "use_ocr"
@@ -74,7 +74,6 @@ export interface PreviewItem {
 
 export interface Plan {
   id: string;
-  revision: number;
   source: string;
   source_kind: "directory" | "file";
   created_at: string;

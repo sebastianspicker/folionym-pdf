@@ -46,7 +46,6 @@ class UISettingsPayload(BaseModel):
     use_vision_fallback: bool = False
     simple_naming_mode: bool = False
     vision_first: bool = False
-    acknowledged_external_endpoint: str = ""
 
 
 class PreviewRequest(BaseModel):
@@ -65,7 +64,6 @@ class ApplyRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    plan_revision: int = Field(ge=1)
     selected_ids: list[str]
 
 

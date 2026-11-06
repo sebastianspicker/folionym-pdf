@@ -7,19 +7,7 @@ import secrets
 import socket
 import sys
 import threading
-import time
 import webbrowser
-
-
-def _open_browser_when_ready(url: str, host: str, port: int) -> None:
-    """Wait briefly for Uvicorn to listen before opening the browser."""
-    for _attempt in range(100):
-        try:
-            with socket.create_connection((host, port), timeout=0.1):
-                webbrowser.open(url)
-                return
-        except OSError:
-            time.sleep(0.05)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -43,17 +31,19 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit("Packaged browser assets are missing. Reinstall Folionym with the web extra.")
 
     host = "127.0.0.1"
+    # Bind before printing or opening the link, so it can only reach this process.
+    try:
+        listener = socket.create_server((host, args.port))
+    except OSError as exc:
+        raise SystemExit(f"Port {args.port} is not available ({exc.strerror}). Choose another with --port.") from exc
     token = secrets.token_urlsafe(32)
     url = f"http://{host}:{args.port}/source?token={token}"
     print(f"Folionym is running at {url}", file=sys.stderr, flush=True)
     if not args.no_open:
-        threading.Thread(
-            target=_open_browser_when_ready,
-            args=(url, host, args.port),
-            name="folionym-browser-open",
-            daemon=True,
-        ).start()
-    uvicorn.run(create_app(static_dir=static_dir, launch_token=token), host=host, port=args.port, log_level="warning")
+        # A thread, because console browsers block until they exit; the socket already listens.
+        threading.Thread(target=webbrowser.open, args=(url,), name="folionym-browser-open", daemon=True).start()
+    app = create_app(static_dir=static_dir, launch_token=token)
+    uvicorn.Server(uvicorn.Config(app, log_level="warning")).run(sockets=[listener])
 
 
 if __name__ == "__main__":

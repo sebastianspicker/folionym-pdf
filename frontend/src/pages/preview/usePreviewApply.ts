@@ -29,7 +29,7 @@ export function usePreviewApply({ plan, selected }: UsePreviewApplyOptions) {
     applyingRef.current = true;
     setApplying(true);
     try {
-      const result = await api.apply(plan.id, plan.revision, [...selected]);
+      const result = await api.apply(plan.id, [...selected]);
       setConfirmOpen(false);
       setRunId(result.run_id);
     } catch (requestError: unknown) {

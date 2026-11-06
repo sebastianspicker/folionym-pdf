@@ -51,7 +51,6 @@ def plan_payload(plan: PreviewPlan, *, include_metadata: bool = True) -> dict[st
     counts = {status.value: plan.count(status) for status in PreviewStatus}
     return {
         "id": plan.id,
-        "revision": plan.revision,
         "source": str(plan.source),
         "source_kind": plan.source_kind,
         "created_at": plan.created_at.isoformat(),

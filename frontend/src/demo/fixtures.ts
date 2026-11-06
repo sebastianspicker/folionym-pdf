@@ -33,7 +33,6 @@ export const demoSettings: Settings = {
   max_content_tokens: "",
   workers: "2",
   max_filename_chars: "120",
-  acknowledged_external_endpoint: "",
   dry_run: false,
   use_llm: true,
   use_ocr: true,
@@ -176,7 +175,6 @@ const demoItems: PreviewItem[] = [
 
 export const demoPlan: Plan = {
   id: "demo-plan",
-  revision: 1,
   source: DEMO_SOURCE,
   source_kind: "directory",
   created_at: "2024-05-02T10:00:00Z",

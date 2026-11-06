@@ -215,15 +215,13 @@ class RunRegistry:
         Thread(target=worker, name=f"folionym-preview-{run.id[:8]}", daemon=True).start()
         return run.id
 
-    def start_apply(self, plan_id: str, revision: int, selected_ids: list[str]) -> str:
+    def start_apply(self, plan_id: str, selected_ids: list[str]) -> str:
         """Start exact reviewed-plan application."""
         with self._lock:
             self._prune_locked()
             plan = self._plans.get(plan_id)
             if plan is None:
                 raise KeyError(plan_id)
-            if plan.revision != revision:
-                raise ValueError("The preview plan revision is stale.")
             run = self._reserve_run_locked("apply", plan_id=plan_id)
 
         def worker() -> None:

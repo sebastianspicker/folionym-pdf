@@ -158,11 +158,6 @@ def _normalize_month_token(month_name: str) -> str:
     return month_name.strip().lower()
 
 
-def _validation_reference_date(today: date) -> date:
-    """Use the injected fallback date as the sole reference for plausibility checks."""
-    return today
-
-
 def _make_date_candidate(
     parts: _DateParts,
     *,
@@ -178,8 +173,7 @@ def _make_date_candidate(
         ValueError,
     ):
         return None
-    validation_today = _validation_reference_date(context.today)
-    if candidate < _DATE_MIN or candidate > validation_today + _DATE_MAX_FUTURE_DELTA:
+    if candidate < _DATE_MIN or candidate > context.today + _DATE_MAX_FUTURE_DELTA:
         return None
     score = base_score
     if context.prefer_leading_chars > 0 and start < context.prefer_leading_chars:

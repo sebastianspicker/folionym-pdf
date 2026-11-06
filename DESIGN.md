@@ -303,7 +303,7 @@ sequenceDiagram
     api-->>ui: items with status and target
     U->>ui: Select items, click Apply
     ui->>api: POST /api/v1/plans/{plan_id}/apply
-    api->>reg: start_apply(plan_id, revision, ids)
+    api->>reg: start_apply(plan_id, ids)
     reg--)plan: thread: apply_reviewed_plan
     plan->>ops: apply_single_rename(exact_target)
     reg-->>ui: SSE completed with report_id
@@ -315,7 +315,7 @@ Steps 2 and 11 return `202` immediately; the work runs on a daemon thread that
 time, so a second start gets `409`. Progress arrives as server-sent events
 (steps 6–7 and 15); `useRun` also polls `GET /api/v1/runs/{id}`, slowly while
 the stream is open and quickly once it drops. The plan from step 8 stays in server memory;
-Apply sends back its `revision` and the selected item IDs, never the target
+Apply sends back only the plan ID and the selected item IDs, never the target
 names, so the browser cannot ask for a name the plan did not propose. Step 14
 passes the source fingerprint captured at Preview, and `rename_ops` refuses if
 the file changed or the target is taken.

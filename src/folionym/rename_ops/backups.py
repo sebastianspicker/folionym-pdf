@@ -41,19 +41,16 @@ def _write_backup(file_path: Path, backup_dir: Path | str | None, *, source_fd: 
 
 
 def _open_private_backup_directory(backup_root: Path) -> int:
-    """Open a private backup directory without following a final symlink."""
+    """Open the backup directory without following a final symlink.
+
+    An existing directory keeps its permissions; only directories created here are owner-only.
+    """
     directory_flags = os.O_RDONLY
     if hasattr(os, "O_DIRECTORY"):
         directory_flags |= os.O_DIRECTORY
     if hasattr(os, "O_NOFOLLOW"):
         directory_flags |= os.O_NOFOLLOW
-    directory_fd = os.open(backup_root, directory_flags)
-    try:
-        os.fchmod(directory_fd, _OWNER_ONLY_DIRECTORY_MODE)
-    except OSError:
-        os.close(directory_fd)
-        raise
-    return directory_fd
+    return os.open(backup_root, directory_flags)
 
 
 def _write_backup_with_directory_fd(

@@ -394,7 +394,7 @@ class FolionymTUI(TuiSourceSelection, TuiValueAccess, App[None]):
         self._set_run_controls_active(False)
         report = message.report
         renamed = report.count(ApplyStatus.RENAMED)
-        skipped = report.count(ApplyStatus.SKIPPED) + report.count(ApplyStatus.UNCHANGED)
+        skipped = report.count(ApplyStatus.UNCHANGED)
         failed = report.count(ApplyStatus.FAILED) + report.count(ApplyStatus.CANCELLED)
         self._run_is_preview = False
         self._set_counts(renamed=renamed, skipped=skipped, failed=failed)

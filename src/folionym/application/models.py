@@ -24,7 +24,6 @@ class ApplyStatus(StrEnum):
     """Outcome of one reviewed-plan apply item."""
 
     RENAMED = "renamed"
-    SKIPPED = "skipped"
     UNCHANGED = "unchanged"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -38,15 +37,6 @@ class Proposal:
     proposed_base: str | None
     metadata: dict[str, object] | None
     error: BaseException | None = None
-
-    @property
-    def status(self) -> PreviewStatus:
-        """Classify success, an empty proposal, and recoverable failure."""
-        if self.error is not None:
-            return PreviewStatus.FAILED
-        if self.proposed_base is None:
-            return PreviewStatus.SKIPPED
-        return PreviewStatus.READY
 
 
 @dataclass(frozen=True)
@@ -103,7 +93,6 @@ class PreviewPlan:
     config: RenamerConfig
     items: tuple[PreviewItem, ...]
     created_at: datetime
-    revision: int = 1
 
     def count(self, status: PreviewStatus) -> int:
         """Count items with ``status``."""

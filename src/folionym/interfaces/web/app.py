@@ -50,9 +50,7 @@ def default_static_dir() -> Path:
 
 
 def _host_name(host_header: str) -> str:
-    """Return a normalized hostname from the HTTP Host header."""
-    if host_header.startswith("["):
-        return host_header.partition("]")[0].lstrip("[")
+    """Return a normalized hostname from the HTTP Host header (the server binds IPv4 loopback only)."""
     return host_header.rsplit(":", 1)[0].lower()
 
 
@@ -233,7 +231,6 @@ def _prepare_preview_settings(request: PreviewRequest, acknowledged: set[str]) -
             )
         acknowledged.add(endpoint)
     settings = request.settings.model_dump()
-    settings["acknowledged_external_endpoint"] = ""
     source = str(_confined_path(request.path))
     if request.source_kind == "file":
         settings["single_file"] = source
@@ -381,7 +378,7 @@ def _register_plan_routes(app: FastAPI, registry: RunRegistry) -> None:
     def apply_plan(plan_id: str, payload: ApplyRequest) -> RunStartedResponse:
         """Enqueue exact application of selected reviewed targets."""
         try:
-            run_id = registry.start_apply(plan_id, payload.plan_revision, payload.selected_ids)
+            run_id = registry.start_apply(plan_id, payload.selected_ids)
         except KeyError as exc:
             raise HTTPException(404, "Preview plan not found.") from exc
         except RunConflictError as exc:

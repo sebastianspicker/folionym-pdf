@@ -69,18 +69,22 @@ def _set_owner_only_permissions(path: Path, mode: int) -> None:
         raise CachePermissionError(path, mode, exc) from exc
 
 
+def _require_private_directory(path: Path) -> None:
+    """Refuse a cache directory another user owns or can write: its entries would be trusted."""
+    if os.name == "nt":
+        return
+    status = path.stat()
+    if status.st_uid != os.getuid() or status.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise PermissionError(errno.EPERM, "Cache directory must be owned by you and not writable by others", str(path))
+
+
 def _write_private_text(path: Path, text: str) -> None:
     """Write a cache entry atomically with owner-only permissions."""
-    # fmt: off
-    try:
-        atomic_write_private_text(
-            path,
-            text,
-            before_write=lambda temp_path: _set_owner_only_permissions(temp_path, _OWNER_ONLY_FILE_MODE),
-        )
-    except (OSError, CachePermissionError):
-        raise
-    # fmt: on
+    atomic_write_private_text(
+        path,
+        text,
+        before_write=lambda temp_path: _set_owner_only_permissions(temp_path, _OWNER_ONLY_FILE_MODE),
+    )
 
 
 def _file_identity(status: os.stat_result) -> tuple[int, int, int, int]:
@@ -112,15 +116,20 @@ class ResponseCache:
         self.cache_dir = None
         if requested_cache_dir is not None:
             try:
+                # A new directory is owner-only; an existing one keeps its permissions.
                 requested_cache_dir.mkdir(parents=True, mode=_OWNER_ONLY_DIR_MODE, exist_ok=True)
-                _set_owner_only_permissions(requested_cache_dir, _OWNER_ONLY_DIR_MODE)
-            except (OSError, CachePermissionError) as exc:
+                _require_private_directory(requested_cache_dir)
+            except OSError as exc:
                 logger.warning("Persistent LLM cache disabled: %s", exc)
             else:
                 self.cache_dir = requested_cache_dir
         self._memory: OrderedDict[str, tuple[str, float]] = OrderedDict()
         self._memory_bytes = 0
         self._lock = threading.Lock()
+        # Pruning reopens every entry, so it runs every Nth write; the disk limits may be
+        # exceeded by at most N - 1 entries (about 1/64 of the entry limit, never above 31).
+        self._prune_interval = max(1, min(32, self.max_disk_entries // 64))
+        self._writes_since_prune = 0
         self._legacy_reads_enabled = bool(
             self.cache_dir is not None and not (self.cache_dir / _CACHE_GENERATION_MARKER).exists()
         )
@@ -363,7 +372,13 @@ class ResponseCache:
             logger.warning("Persistent LLM cache disabled: %s", exc)
             with self._lock:
                 self.cache_dir = None
-        else:
+            return
+        with self._lock:
+            self._writes_since_prune += 1
+            prune_due = self._writes_since_prune >= self._prune_interval
+            if prune_due:
+                self._writes_since_prune = 0
+        if prune_due:
             self._prune_disk()
 
     def _disable_legacy_reads(self) -> bool:

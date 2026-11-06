@@ -61,7 +61,12 @@ Legacy cache responses stay readable until the first new-format cache write mark
 the directory as migrated, after which reads ignore legacy entries so an evicted
 replacement cannot expose an older response. Responses are still written
 atomically with owner-only permissions where supported. Disk eviction uses entry
-age; memory eviction uses recency.
+age; memory eviction uses recency. Disk pruning reopens every entry, so with large
+limits it runs on every 32nd write, so between prunes the disk can hold up to 31
+entries (and their bytes) beyond its budgets. A cache directory that already
+exists keeps its permissions; a new one is created owner-only. A directory that
+another user owns, or that group or others can write, disables the disk cache
+with a warning, because its entries would be trusted.
 
 Vision images are downscaled before rasterization to satisfy the pixel and
 dimension bounds, and oversized encoded images are refused before a base64

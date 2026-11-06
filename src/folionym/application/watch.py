@@ -6,7 +6,6 @@ import contextlib
 import logging
 import signal
 import threading
-import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -156,19 +155,22 @@ def _run_watch_iteration(
 def _run_watch_cycle(
     context: WatchLoopContext,
     state: WatchLoopState,
-    stop_requested: Callable[[], bool],
+    stop: threading.Event,
 ) -> WatchLoopState:
-    """Run one watch iteration, retaining state after recoverable failures."""
+    """Run one watch iteration, retaining state after recoverable failures.
+
+    The pause between scans waits on ``stop`` so a signal ends it at once; ``time.sleep``
+    would resume after the handler returns and delay shutdown by up to the interval.
+    """
     try:
-        next_state = _run_watch_iteration(context.path, context.config, state, stop_requested, context.hooks)
+        next_state = _run_watch_iteration(context.path, context.config, state, stop.is_set, context.hooks)
     except _RECOVERABLE_WATCH_EXCEPTIONS as exc:
-        if stop_requested():
+        if stop.is_set():
             return state
         logger.exception("Watch iteration failed: %s", exc)
-        time.sleep(context.interval_seconds)
+        stop.wait(context.interval_seconds)
         return state
-    if not stop_requested():
-        time.sleep(context.interval_seconds)
+    stop.wait(context.interval_seconds)
     return next_state
 
 
@@ -213,13 +215,14 @@ def run_watch_loop(
     if not path.is_dir():
         raise NotADirectoryError(f"Not a directory: {path}")
 
-    stop_requested = False
+    stop = threading.Event()
 
     def handle_stop(sig: int, frame: FrameType | None) -> None:
         """Set the loop stop flag and log the received signal."""
-        nonlocal stop_requested
         logger.info("Watch mode: received signal %s, stopping...", sig)
-        stop_requested = True
+        # Set from a helper thread: the handler runs on the main thread, which may hold the
+        # Event's internal lock inside wait(), and taking it again here would deadlock.
+        threading.Thread(target=stop.set, name="folionym-watch-stop", daemon=True).start()
 
     is_main_thread, original_sigterm, original_sigint = _install_watch_signal_handlers(handle_stop)
 
@@ -228,8 +231,8 @@ def run_watch_loop(
     loop_state = WatchLoopState(seen={}, renamed_targets=set())
     logger.info("Watch mode: scanning %s every %.1fs (Ctrl+C or SIGTERM to stop)", path, interval_seconds)
     try:
-        while not stop_requested:
-            loop_state = _run_watch_cycle(context, loop_state, lambda: stop_requested)
+        while not stop.is_set():
+            loop_state = _run_watch_cycle(context, loop_state, stop)
     finally:
         _restore_watch_signal_handlers(is_main_thread, original_sigterm, original_sigint)
         logger.info("Watch stopped")

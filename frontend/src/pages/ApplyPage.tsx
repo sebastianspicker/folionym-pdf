@@ -11,7 +11,6 @@ const TALLY: Array<{ key: keyof Report["counts"]; label: string }> = [
   { key: "renamed", label: "Renamed" },
   { key: "failed", label: "Failed" },
   { key: "unchanged", label: "Unchanged" },
-  { key: "skipped", label: "Skipped" },
   { key: "cancelled", label: "Cancelled" },
 ];
 

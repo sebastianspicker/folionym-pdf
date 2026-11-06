@@ -28,6 +28,12 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Changed
 
+- The persistent response cache prunes its disk entries every 32nd write instead
+  of on every write when the entry limit is large. In a local measurement at
+  2,048 entries this cut a cached write from about 280 ms to 12 ms; between
+  prunes the disk may hold up to 31 entries beyond its budgets.
+- `folionym-web` binds its port before printing or opening the launch link, and
+  exits with a clear message when the port is taken.
 - `DESIGN.md` explains how each command runs, how one PDF becomes a proposed
   name, the browser's HTTP and event flow, plan item states, and the build and
   release pipeline, each linked to the code that implements it.
@@ -148,6 +154,16 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Fixed
 
+- Backups and the response cache no longer change the permissions of a folder
+  that already exists; only folders Folionym creates are made owner-only.
+  Previously a shared `--backup-dir` or `--cache-dir` was set to `0700`. A cache
+  directory that another user owns or that group or others can write now
+  disables the disk cache with a warning instead.
+- The browser app starts when `~/.folionym_ui.json` holds keys from older
+  releases (such as `llm_backend`) or mistyped values; unknown keys are dropped
+  and mistyped values fall back to their defaults.
+- Ctrl+C or SIGTERM now stops watch mode at once instead of after the remaining
+  scan interval.
 - The filename date no longer comes from an 8-digit customer, invoice or order
   number when the text also has a written date such as `12.03.2024`, and
   dates with a two-digit year and two-digit day and month (`15.01.24`) are
@@ -272,6 +288,11 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Removed
 
+- The browser plan `revision` and the `plan_revision` apply field: plans never
+  change, so the plan ID already identifies the reviewed plan.
+- The legacy `acknowledged_external_endpoint` settings key; external-endpoint
+  consent stays per server run.
+- The never-produced `skipped` apply status and the unused `Proposal.status`.
 - The unused browser API route that downloaded a preview's rename log,
   metadata export or summary file.
 - The obsolete GUI command alias and the former Python compatibility façade.

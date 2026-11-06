@@ -8,7 +8,6 @@ const reportFilters: Array<{ status: ApplyStatus | "all"; label: string }> = [
   { status: "renamed", label: "Renamed" },
   { status: "failed", label: "Failed" },
   { status: "unchanged", label: "Unchanged" },
-  { status: "skipped", label: "Skipped" },
   { status: "cancelled", label: "Cancelled" },
 ];
 
@@ -21,7 +20,7 @@ export function ApplyReportLedger({ items }: { items: ApplyItem[] }) {
   const [requestedPage, setPage] = useState(0);
   const counts = useMemo(() => {
     const result: Record<ApplyStatus | "all", number> = {
-      all: items.length, renamed: 0, skipped: 0, unchanged: 0, failed: 0, cancelled: 0,
+      all: items.length, renamed: 0, unchanged: 0, failed: 0, cancelled: 0,
     };
     for (const item of items) result[item.status] += 1;
     return result;

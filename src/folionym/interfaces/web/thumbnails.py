@@ -48,7 +48,7 @@ class ThumbnailCache:
         self._ttl = ttl
         self._renderer = renderer
         self._bytes = 0
-        self._entries: OrderedDict[tuple[str, int, str], tuple[float, bytes]] = OrderedDict()
+        self._entries: OrderedDict[tuple[str, str], tuple[float, bytes]] = OrderedDict()
         self._lock = Lock()
 
     def _prune(self, now: float) -> None:
@@ -70,7 +70,7 @@ class ThumbnailCache:
         item = next((candidate for candidate in plan.items if candidate.id == item_id), None)
         if item is None:
             raise HTTPException(404, "Preview item not found.")
-        key = (plan.id, plan.revision, item.id)
+        key = (plan.id, item.id)
         # Serializing rendering also bounds concurrent native pixmap allocations.
         with self._lock:
             self._validate(item)

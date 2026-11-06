@@ -99,11 +99,8 @@ const localApi = {
   cancel: (id: string) => request<Run>(`/api/v1/runs/${id}/cancel`, json({})),
   plan: (id: string) => request<Plan>(`/api/v1/plans/${id}?include_metadata=false`),
   item: (id: string, itemId: string) => request<PreviewItem>(`/api/v1/plans/${id}/items/${itemId}`),
-  apply: (id: string, revision: number, selectedIds: string[]) =>
-    request<{ run_id: string }>(
-      `/api/v1/plans/${id}/apply`,
-      json({ plan_revision: revision, selected_ids: selectedIds }),
-    ),
+  apply: (id: string, selectedIds: string[]) =>
+    request<{ run_id: string }>(`/api/v1/plans/${id}/apply`, json({ selected_ids: selectedIds })),
   report: (id: string) => request<Report>(`/api/v1/reports/${id}`),
 };
 
@@ -143,12 +140,10 @@ export const api = {
     isDemo ? loadDemoApi().then((client) => client.plan(id)) : localApi.plan(id),
   item: (id: string, itemId: string) =>
     isDemo ? loadDemoApi().then((client) => client.item(id, itemId)) : localApi.item(id, itemId),
-  apply: (id: string, revision: number, selectedIds: string[]) =>
+  apply: (id: string, selectedIds: string[]) =>
     isDemo
-      ? loadDemoApi().then((client) =>
-          client.apply(id, revision, selectedIds),
-        )
-      : localApi.apply(id, revision, selectedIds),
+      ? loadDemoApi().then((client) => client.apply(id, selectedIds))
+      : localApi.apply(id, selectedIds),
   report: (id: string) =>
     isDemo
       ? loadDemoApi().then((client) => client.report(id))

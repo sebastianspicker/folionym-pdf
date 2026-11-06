@@ -121,7 +121,6 @@ function buildReport(selectedIds: string[]): Report {
     items,
     counts: {
       renamed: items.filter((item) => item.status === "renamed").length,
-      skipped: 0,
       unchanged: items.filter((item) => item.status === "unchanged").length,
       failed: items.filter((item) => item.status === "failed").length,
       cancelled: 0,
@@ -196,7 +195,7 @@ export const demoApi = {
     if (!item) throw new Error("Document unavailable.");
     return { ...item, metadata: { ...item.metadata } };
   },
-  apply: async (_id: string, _revision: number, selectedIds: string[]) => {
+  apply: async (_id: string, selectedIds: string[]) => {
     latestReport = buildReport(selectedIds);
     const runId = "demo-apply-run";
     runs.set(runId, {
