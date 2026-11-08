@@ -8,7 +8,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from ..infrastructure.files import open_regular_file_no_follow
+from ..infrastructure.files import is_same_entry, open_regular_file_no_follow
 from .backups import _write_backup
 from .filesystem import _rename_without_overwrite, _validate_expected_identity
 from .options import (
@@ -67,7 +67,7 @@ def _source_already_named(
 ) -> bool:
     """Return whether the source is the first candidate that is not occupied by another file."""
     for _attempt in range(MAX_RENAME_RETRIES):
-        if state.target == retry_context.file_path:
+        if state.target == retry_context.file_path or is_same_entry(state.target, retry_context.file_path):
             return True
         if options.exact_target or not os.path.lexists(state.target):
             return False
@@ -119,10 +119,15 @@ def _apply_rename_attempt(
     # attempt stays behind, but the source keeps its name.
     if state.target == file_path:
         return True, file_path
-    if (options.dry_run or options.plan_file_path) and os.path.lexists(state.target):
+    if (options.dry_run or options.plan_file_path) and (
+        os.path.lexists(state.target) or _already_planned(state.target, options)
+    ):
         raise FileExistsError(f"Target already exists: {state.target}")
     if _record_rename_plan(file_path, state.target, options):
         return True, state.target
+    if options.dry_run and options.plan_entries is not None:
+        # Reserve the simulated target so the next file in this run sees it as taken.
+        options.plan_entries.append({"old": str(file_path), "new": str(state.target)})
     if not options.dry_run:
         _rename_without_overwrite(
             file_path,
@@ -132,6 +137,11 @@ def _apply_rename_attempt(
         )
         _notify_rename_success(options.on_success, file_path, state.target, state.current_base)
     return True, state.target
+
+
+def _already_planned(target: Path, options: RenameApplyOptions) -> bool:
+    """Return whether an earlier file in this simulated run already took the target."""
+    return options.plan_entries is not None and any(entry["new"] == str(target) for entry in options.plan_entries)
 
 
 def _record_rename_plan(file_path: Path, target: Path, options: RenameApplyOptions) -> bool:

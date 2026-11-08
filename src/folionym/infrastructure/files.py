@@ -17,6 +17,14 @@ def reject_source_symlink(path: Path) -> None:
         raise OSError(errno.ELOOP, "Source PDF symbolic links are not supported", path)
 
 
+def is_same_entry(first: Path, second: Path) -> bool:
+    """Return whether two names reach one inode, e.g. case variants on a case-insensitive disk."""
+    try:
+        return os.path.samestat(first.lstat(), second.lstat())
+    except OSError:
+        return False
+
+
 def _open_path_without_symlinks(path: Path, *, directory: bool) -> int:
     """Open an absolute path one component at a time without following links."""
     requested = os.path.abspath(path)

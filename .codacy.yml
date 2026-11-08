@@ -1,0 +1,4 @@
+---
+# Lockfiles stay analyzed: Trivy reads dependency CVEs from them.
+exclude_paths:
+  - "src/folionym/web_dist/**"

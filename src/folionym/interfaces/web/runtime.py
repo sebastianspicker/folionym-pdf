@@ -13,7 +13,7 @@ from typing import Literal
 from uuid import uuid4
 
 from ...application.models import ApplyReport, PreviewPlan
-from ...application.reviewed_plan import apply_reviewed_plan, create_preview_plan
+from ...application.reviewed_plan import apply_reviewed_plan, create_preview_plan, selected_plan_items
 from ..ui_settings import build_config_from_ui_settings, save_ui_settings
 
 logger = logging.getLogger(__name__)
@@ -222,6 +222,7 @@ class RunRegistry:
             plan = self._plans.get(plan_id)
             if plan is None:
                 raise KeyError(plan_id)
+            selected_plan_items(plan, frozenset(selected_ids))
             run = self._reserve_run_locked("apply", plan_id=plan_id)
 
         def worker() -> None:

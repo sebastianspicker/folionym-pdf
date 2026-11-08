@@ -154,6 +154,15 @@ candidate commit is tagged and published as a GitHub prerelease.
 
 ### Fixed
 
+- The browser apply endpoint rejects a selection that names unknown or
+  non-applicable items with HTTP 422 instead of starting a run that fails.
+- `folionym-undo` no longer skips a logged rename whose original name holds a
+  Unicode line or paragraph separator.
+- A dry run and a `--plan-file` export no longer give two files the same
+  target; the second gets the `_1` name the real run would give it.
+- A proposal that differs from the current filename only in letter case no
+  longer produces a `_1` name on a case-insensitive disk such as macOS; the
+  file is left unchanged.
 - Backups and the response cache no longer change the permissions of a folder
   that already exists; only folders Folionym creates are made owner-only.
   Previously a shared `--backup-dir` or `--cache-dir` was set to `0700`. A cache

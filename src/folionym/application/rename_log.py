@@ -42,7 +42,8 @@ def append_rename_log_entry(rename_log_path: str | Path, file_path: Path, target
 def read_rename_log_pairs(log_path: Path) -> list[tuple[str, str]]:
     """Parse valid tab-separated rename pairs and return them in reverse order for LIFO undo."""
     pairs: list[tuple[str, str]] = []
-    for line in log_path.read_text(encoding="utf-8").splitlines():
+    # split("\n"), not splitlines(): source names may hold \x85 or \u2028, which splitlines() breaks on.
+    for line in log_path.read_text(encoding="utf-8").split("\n"):
         if line == "" or line.isspace():
             continue
         parts = line.split("\t", 1)

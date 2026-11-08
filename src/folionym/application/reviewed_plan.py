@@ -11,7 +11,7 @@ from threading import Event
 from uuid import uuid4
 
 from ..infrastructure.filenames import sanitize_filename_base
-from ..infrastructure.files import reject_source_symlink
+from ..infrastructure.files import is_same_entry, reject_source_symlink
 from ..rename_ops import RenameApplyOptions, apply_single_rename
 from ..settings import RenamerConfig
 from .artifacts import RenameOutputData, RenameSummaryData, write_export_metadata, write_summary_json
@@ -202,7 +202,7 @@ def _perform_exact_rename(item: PreviewItem, config: RenamerConfig, output: Rena
         reject_source_symlink(item.source)
         base = sanitize_filename_base(item.proposed_base)
         exact_target = item.source.with_name(base + item.source.suffix)
-        if exact_target == item.source:
+        if exact_target == item.source or is_same_entry(exact_target, item.source):
             return ApplyItemResult(
                 item.id,
                 item.source.name,
@@ -263,7 +263,7 @@ def _record_apply_output(output: RenameOutputData, item: PreviewItem, result: Ap
         output.failure_details.append({"file": str(item.source), "error": result.reason or "Rename failed."})
 
 
-def _selected_items(plan: PreviewPlan, selected: frozenset[str]) -> list[PreviewItem]:
+def selected_plan_items(plan: PreviewPlan, selected: frozenset[str]) -> list[PreviewItem]:
     """Validate the requested item IDs and return their reviewed items."""
     selectable = {item.id: item for item in plan.items if item.status in {PreviewStatus.READY, PreviewStatus.REVIEW}}
     unknown = selected - selectable.keys()
@@ -313,7 +313,7 @@ def apply_reviewed_plan(
     """Apply only selected reviewed names after per-file identity and collision validation."""
     started_at = datetime.now(UTC)
     selected = frozenset(selected_ids)
-    selected_items = _selected_items(plan, selected)
+    selected_items = selected_plan_items(plan, selected)
     duplicate_ids = _duplicate_target_ids(selected_items)
     active_stop_event = stop_event if stop_event is not None else Event()
     config = _apply_config(plan, active_stop_event)
